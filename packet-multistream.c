@@ -37,7 +37,11 @@ void proto_register_multistream(void);
 
 /* Initialize the protocol and registered fields */
 static int proto_multistream = -1;
-static int hf_multistream_FIELDABBREV = -1;
+static int hf_multistream_protocol = -1;
+static int hf_multistream_listener = -1;
+static int hf_multistream_dialer = -1;
+static int hf_multistream_handshake = -1;
+static int hf_multistream_data = -1;
 static expert_field ei_multistream_EXPERTABBREV = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
@@ -192,11 +196,26 @@ proto_register_multistream(void)
     /* Setup list of header fields  See Section 1.5 of README.dissector for
      * details. */
     static hf_register_info hf[] = {
-        { &hf_multistream_FIELDABBREV,
-          { "FIELDNAME", "multistream.FIELDABBREV",
-            FT_FIELDTYPE, FIELDDISPLAY, FIELDCONVERT, BITMASK,
-            "FIELDDESCR", HFILL }
-        }
+      { &hf_multistream_protocol,
+              { "Protocol",    "multistream.protocol",
+                      FT_STRING,       BASE_NONE,      NULL,   0x0,
+                      "Protocol being negotiated on", HFILL }},
+      { &hf_multistream_dialer,
+              { "Dialer",    "multistream.dialer",
+                      FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                      "TRUE if the packet is sent from the dialer", HFILL }},
+      { &hf_multistream_listener,
+              { "Listener",    "multistream.listener",
+                      FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                      "TRUE if the packet is sent from the listener", HFILL }},
+      { &hf_multistream_handshake,
+              { "Handshake",    "multistream.handshake",
+                      FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                      "TRUE if the packet is part of the handshake process", HFILL }},
+      { &hf_multistream_data,
+              { "Data",    "multistream.data",
+                      FT_BYTES,       BASE_NONE,      NULL,   0x0,
+                      "Raw conversation data", HFILL }}
     };
 
     /* Setup protocol subtree array */
