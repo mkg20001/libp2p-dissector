@@ -19,15 +19,11 @@
 /* "System" includes used only as needed */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
-#include <epan/prefs.h>    /* Include only as needed */
 #include <epan/conversation.h>
-#include <epan/to_str.h>
 
-#include "packet-multistream.h"
 #include "length-prefixed.h"
 
 /* Prototypes */
@@ -41,7 +37,6 @@ static int hf_multistream_protocol = -1;
 static int hf_multistream_listener = -1;
 static int hf_multistream_dialer = -1;
 static int hf_multistream_handshake = -1;
-static int hf_multistream_data = -1;
 static int hf_multistream_version = -1;
 // static expert_field ei_multistream_EXPERTABBREV = EI_INIT;
 
@@ -85,6 +80,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     /* Other misc. local variables. */
     guint       offset = 0;
     int         len    = tvb_captured_length(tvb);
+    gboolean    raw    = 0;
 #if 0
     /*** HEURISTICS ***/
 
@@ -158,7 +154,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           pinfo->desegment_len = (guint32)20 -len;
         } else {
           int bytesCount;
-          gchar* proto = lp_decode(tvb, 0, &bytesCount);
+          gchar* proto = lp_decode_cut(tvb, 0, &bytesCount, 1);
           if (proto) {
             conv->listenerMSVer = g_strdup(proto);
             conv->helloPacket = pinfo->num;
@@ -171,7 +167,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           pinfo->desegment_len = 1;
         } else {
           int bytesCount;
-          gchar* resProto = lp_decode(tvb, 0, &bytesCount);
+          gchar* resProto = lp_decode_cut(tvb, 0, &bytesCount, 1);
           if (resProto) {
             conv->supported = conv->protocol == resProto;
             conv->handshaked = TRUE;
@@ -192,11 +188,11 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           pinfo->desegment_len = (guint32)21 - len;
         } else {
           int bytesCount;
-          gchar *proto = lp_decode(tvb, 0, &bytesCount);
+          gchar *proto = lp_decode_cut(tvb, 0, &bytesCount, 1);
           if (proto) {
             offset += bytesCount;
             int bytesCount2 = 0;
-            gchar *reqProto = lp_decode(tvb, 20, &bytesCount2);
+            gchar *reqProto = lp_decode_cut(tvb, 20, &bytesCount2, 1);
             if (reqProto) {
               conv->dialerMSVer = g_strdup(proto);
               conv->protocol = g_strdup(reqProto);
@@ -249,7 +245,12 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   } else if (conv->handshaked) {
     col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
     col_set_str(pinfo->cinfo, COL_INFO, "Data");
-    col_append_fstr(pinfo->cinfo, COL_INFO, " %i bytes", len);
+    if (len == 1) {
+      col_append_str(pinfo->cinfo, COL_INFO, " 1 byte");
+    } else {
+      col_append_fstr(pinfo->cinfo, COL_INFO, " %i bytes", len);
+    }
+    raw = TRUE;
   }
 
   /*** PROTOCOL TREE ***/
@@ -271,27 +272,37 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     ti = proto_tree_add_item(tree, proto_multistream, tvb, 0, -1, ENC_NA);
     multistream_tree = proto_item_add_subtree(ti, ett_multistream);
 
-    proto_item* hidden;
+    proto_item* hidden = NULL;
     if (dialer) {
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_dialer, tvb, 0, 0, 1);
     }
     if (listener) {
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_listener, tvb, 0, 0, 1);
     }
-    PROTO_ITEM_SET_HIDDEN(hidden);
+    if (hidden) {
+      PROTO_ITEM_SET_HIDDEN(hidden);
+      PROTO_ITEM_SET_GENERATED(hidden);
+    }
+    hidden = NULL;
 
     if (pinfo->num == conv->helloPacket) {
       proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer);
+      hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (pinfo->num == conv->selectPacket) {
       proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->dialerMSVer);
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+      hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (pinfo->num == conv->ackPacket) {
       proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer);
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+      hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (conv->handshaked) {
       proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer); // at this point they are equal
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
-      proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, 0, -1, ENC_NA);
+    }
+    if (hidden) {
+      PROTO_ITEM_SET_HIDDEN(hidden);
+      PROTO_ITEM_SET_GENERATED(hidden);
     }
   }
 
@@ -316,6 +327,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* Return the amount of data this dissector was able to dissect (which may
      * or may not be the total captured packet as we return here). */
+    if (raw) return 0;
     return tvb_captured_length(tvb);
 }
 
@@ -352,11 +364,7 @@ proto_register_multistream(void)
       { &hf_multistream_version,
               { "Version",    "multistream.version",
                       FT_STRING,       BASE_NONE,      NULL,   0x0,
-                      "Multistream version used", HFILL }},
-      { &hf_multistream_data,
-              { "Data",    "multistream.data",
-                      FT_BYTES,       BASE_NONE,      NULL,   0x0,
-                      "Raw conversation data", HFILL }}
+                      "Multistream version used", HFILL }}
     };
 
     /* Setup protocol subtree array */

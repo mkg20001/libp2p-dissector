@@ -6,10 +6,9 @@
  */
 
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
-#include <stdio.h>
 #include "length-prefixed.h"
 
-// modified tvb_get_varint to tell when bytes are missing
+// modified tvb_get_varint to tell when bytes are missing (uses ENC_PROTOBUF_VARINT version)
 guint
 get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, gboolean *missing)
 {
@@ -35,7 +34,7 @@ get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, gboolean *
   return 0; /* 10 bytes scanned, but no bytes' msb is zero */
 }
 
-gchar* lp_decode(tvbuff_t *tvb, const guint offset, int *bytesCount) {
+gchar* lp_decode_cut(tvbuff_t *tvb, const guint offset, int *bytesCount, int cutBytes) {
   *bytesCount = 1;
   if (!tvb_offset_exists(tvb, offset)) {
     return NULL;
@@ -52,7 +51,8 @@ gchar* lp_decode(tvbuff_t *tvb, const guint offset, int *bytesCount) {
   if (!tvb_offset_exists(tvb, offset + *bytesCount - 1)) {
     return NULL;
   }
-  fprintf(stderr, "@= len=%i, total=%i\n", offset + length + prefixLength, tvb_captured_length(tvb));
-  fprintf(stderr, "@of=%i, prf=%i, len=%i, bytes=%i\n", offset, prefixLength, length, *bytesCount);
-  return tvb_format_text(tvb, offset + prefixLength, length);
+  return tvb_format_text(tvb, offset + prefixLength, length - cutBytes);
+}
+gchar* lp_decode(tvbuff_t *tvb, const guint offset, int *bytesCount) {
+  return lp_decode_cut(tvb, offset, bytesCount, 0);
 }
