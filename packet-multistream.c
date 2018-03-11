@@ -37,6 +37,7 @@ static int hf_multistream_protocol = -1;
 static int hf_multistream_listener = -1;
 static int hf_multistream_dialer = -1;
 static int hf_multistream_handshake = -1;
+static int hf_multistream_data = -1;
 static int hf_multistream_version = -1;
 // static expert_field ei_multistream_EXPERTABBREV = EI_INIT;
 
@@ -299,6 +300,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     } else if (conv->handshaked) {
       proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer); // at this point they are equal
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+      hidden = proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, offset, -1, ENC_NA);
     }
     if (hidden) {
       PROTO_ITEM_SET_HIDDEN(hidden);
@@ -361,6 +363,10 @@ proto_register_multistream(void)
                   { "Handshake",    "multistream.handshake",
                           FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
                           "TRUE if the packet is part of the handshake process", HFILL }},
+          { &hf_multistream_data,
+                  { "Data",    "multistream.data",
+                          FT_BYTES,       BASE_NONE,      NULL,   0x0,
+                          "Raw bytes transferred", HFILL }},
           { &hf_multistream_version,
                   { "Version",    "multistream.version",
                           FT_STRING,       BASE_NONE,      NULL,   0x0,
