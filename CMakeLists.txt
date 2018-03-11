@@ -19,11 +19,12 @@ set(DISSECTOR_SRC
 
 set(PLUGIN_FILES
 	plugin.c
-	${CMAKE_CURRENT_SOURCE_DIR}/protos/secio.pb.cc
+	${CMAKE_CURRENT_SOURCE_DIR}/protos/secio.pb-c.c
 	${DISSECTOR_SRC}
 )
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf-c.cmake)
 
 set_source_files_properties(
 	${PLUGIN_FILES}
@@ -36,11 +37,12 @@ file(GLOB PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/protos/*.proto")
 macro(compile_proto_file filename)
 	get_filename_component(basename ${filename} NAME_WE)
 	add_custom_command(
-			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb.cc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb.h
+			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h
 			DEPENDS protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
 			COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
 			--proto_path=${CMAKE_CURRENT_SOURCE_DIR}/protos
-			--cpp_out=${CMAKE_CURRENT_SOURCE_DIR}/protos
+			--plugin=$<TARGET_FILE:protoc-gen-c>
+			--c_out=${CMAKE_CURRENT_SOURCE_DIR}/protos
 	)
 endmacro(compile_proto_file)
 
