@@ -68,6 +68,10 @@ typedef struct _ms_conv_info_t {
   gchar* listenerMSVer;
   gchar* dialerMSVer;
   gchar* protocol;
+  gboolean supported;
+  guint32 helloPacket;
+  guint32 selectPacket;
+  guint32 ackPacket;
 } ms_conv_info_t;
 
 /* Code to actually dissect the packets */
@@ -182,30 +186,19 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     dialer = 1;
   }
 
-//  if (tree) {
-    /* create display subtree for the protocol */
-    ti = proto_tree_add_item(tree, proto_multistream, tvb, 0, -1, ENC_NA);
-    multistream_tree = proto_item_add_subtree(ti, ett_multistream);
-//  }
+  if (tree) {
+  }
 
-  if (conv->handshaked) {
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
-  } else {
+  if (!conv->handshaked) {
     fprintf(stderr, "\naddr: %s, l: %i, d: %i, la: %s, da: %s\n", address_to_display(wmem_packet_scope(), &pinfo->src), listener, dialer, address_to_display(wmem_packet_scope(), &conv->listenerAddr), address_to_display(wmem_packet_scope(), &conv->dialerAddr));
 
     if (!conv->listenerAddr.len && !listener && !dialer) {
       copy_address_wmem(wmem_file_scope(), &conv->listenerAddr, &pinfo->src);
-      /* fprintf(stderr, "%s->", address_to_display(wmem_packet_scope(), &pinfo->src));
-      fprintf(stderr, "%s", address_to_display(wmem_packet_scope(), &pinfo->dst));
-      fprintf(stderr, "@%s,l" ,address_to_display(wmem_packet_scope(), &conv->listenerAddr)); */
       listener = 1;
     }
 
     if (!conv->dialerAddr.len && !listener && !dialer && !addresses_equal(&pinfo->src, &conv->listenerAddr)) {
       copy_address_wmem(wmem_file_scope(), &conv->dialerAddr, &pinfo->src);
-      /* fprintf(stderr, "%s->", address_to_display(wmem_packet_scope(), &pinfo->src));
-      fprintf(stderr, "%s", address_to_display(wmem_packet_scope(), &pinfo->dst));
-      fprintf(stderr, "@%s,d" ,address_to_display(wmem_packet_scope(), &conv->dialerAddr)); */
       dialer = 1;
     }
 
@@ -217,22 +210,40 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           int bytesCount;
           gchar* proto = lp_decode(tvb, 0, &bytesCount);
           if (proto) {
-            conv->listenerMSVer = proto;
-            // col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s)", proto); // todo(mkg20001): figure out why pinfo->cinfo is null
-//              if (tree) {
-//            proto_tree_add_string_format(multistream_tree, hf_multistream_version, tvb, 0, offset, "%s", proto);
-//              }
+            conv->listenerMSVer = g_strdup(proto);
+            col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s)", proto); // todo(mkg20001): figure out why pinfo->cinfo is null
+            conv->helloPacket = pinfo->num;
+            /* if (tree) {
+              proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset, proto);
+            } */
           } else {
             pinfo->desegment_len = (guint32)bytesCount - len;
           }
         }
       } else { // ack/nack
-
+        if (len < 1) {
+          pinfo->desegment_len = 1;
+        } else {
+          int bytesCount;
+          gchar* resProto = lp_decode(tvb, 0, &bytesCount);
+          if (resProto) {
+            conv->supported = conv->protocol == resProto;
+            conv->handshaked = TRUE;
+            conv->ackPacket = pinfo->num;
+            if (conv->supported) {
+              col_append_fstr(pinfo->cinfo, COL_INFO, " NACK");
+            } else {
+              col_append_fstr(pinfo->cinfo, COL_INFO, " ACK (%s)", resProto);
+            }
+          } else {
+            pinfo->desegment_len = (guint32)bytesCount - len;
+          }
+        }
       }
     } else if (dialer) {
       if (!conv->dialerMSVer) { // version message and select
-        if (len < 24) {
-          pinfo->desegment_len = (guint32)24 - len;
+        if (len < 21) {
+          pinfo->desegment_len = (guint32)21 - len;
         } else {
           int bytesCount;
           gchar *proto = lp_decode(tvb, 0, &bytesCount);
@@ -241,13 +252,9 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             int bytesCount2 = 0;
             gchar *reqProto = lp_decode(tvb, 20, &bytesCount2);
             if (reqProto) {
-              conv->dialerMSVer = proto;
-              conv->protocol = reqProto;
-              // col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s) select (%s)", proto, reqProto); // todo(mkg20001): figure out why pinfo->cinfo is null
-//              if (tree) {
-//                proto_tree_add_string_format(multistream_tree, hf_multistream_version, tvb, 0, offset, "%s", proto);
-//                proto_tree_add_string_format(multistream_tree, hf_multistream_protocol, tvb, 0, offset, "%s", reqProto);
-//              }
+              conv->dialerMSVer = g_strdup(proto);
+              conv->protocol = g_strdup(reqProto);
+              conv->selectPacket = pinfo->num;
             } else {
               pinfo->desegment_len = (guint32)bytesCount2 - (len - offset);
             }
@@ -259,13 +266,48 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
   }
 
-  if (tree && !pinfo->desegment_len) {
-    if (dialer) {
-      PROTO_ITEM_SET_HIDDEN(proto_tree_add_boolean(multistream_tree, hf_multistream_dialer, tvb, 0, 0, 1));
+  if (pinfo->num == conv->helloPacket) {
+    col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s)", conv->listenerMSVer);
+  } else if (pinfo->num == conv->selectPacket) {
+    col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s) select (%s)", conv->dialerMSVer, conv->protocol);
+  } else if (pinfo->num == conv->ackPacket) {
+    if (conv->supported) {
+      col_append_fstr(pinfo->cinfo, COL_INFO, " NACK");
+    } else {
+      col_append_fstr(pinfo->cinfo, COL_INFO, " ACK (%s)", conv->protocol);
     }
+  } else if (conv->handshaked) {
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
+    col_set_str(pinfo->cinfo, COL_INFO, "Data");
+    col_append_fstr(pinfo->cinfo, COL_INFO, " %i bytes", len);
+  }
 
+  if (tree && !pinfo->desegment_len) {
+    /* create display subtree for the protocol */
+    ti = proto_tree_add_item(tree, proto_multistream, tvb, 0, -1, ENC_NA);
+    multistream_tree = proto_item_add_subtree(ti, ett_multistream);
+
+    proto_item* hidden;
+    if (dialer) {
+      hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_dialer, tvb, 0, 0, 1);
+    }
     if (listener) {
-      PROTO_ITEM_SET_HIDDEN(proto_tree_add_boolean(multistream_tree, hf_multistream_listener, tvb, 0, 0, 1));
+      hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_listener, tvb, 0, 0, 1);
+    }
+    PROTO_ITEM_SET_HIDDEN(hidden);
+
+    if (pinfo->num == conv->helloPacket) {
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer);
+    } else if (pinfo->num == conv->selectPacket) {
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->dialerMSVer);
+      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+    } else if (pinfo->num == conv->ackPacket) {
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer);
+      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+    } else if (conv->handshaked) {
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer); // at this point they are equal
+      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+      proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, 0, -1, ENC_NA);
     }
   }
 
