@@ -1,6 +1,6 @@
 /* packet-multistream.c
  * Routines for Multistream 1.0.0 dissection
- * Copyright 2017, Maciej Krüger <mkg20001@gmail.com>
+ * Copyright 2018, Maciej Krüger <mkg20001@gmail.com>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
