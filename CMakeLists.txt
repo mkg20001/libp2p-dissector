@@ -19,6 +19,7 @@ set(DISSECTOR_SRC
 
 set(PLUGIN_FILES
 	plugin.c
+	${CMAKE_CURRENT_SOURCE_DIR}/protos/secio.pb.cc
 	${DISSECTOR_SRC}
 )
 
@@ -29,6 +30,23 @@ set_source_files_properties(
 	PROPERTIES
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
+
+file(GLOB PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/protos/*.proto")
+
+macro(compile_proto_file filename)
+	get_filename_component(basename ${filename} NAME_WE)
+	add_custom_command(
+			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb.cc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb.h
+			DEPENDS protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
+			COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
+			--proto_path=${CMAKE_CURRENT_SOURCE_DIR}/protos
+			--cpp_out=${CMAKE_CURRENT_SOURCE_DIR}/protos
+	)
+endmacro(compile_proto_file)
+
+foreach(proto_file ${PROTOS})
+	compile_proto_file(${proto_file})
+endforeach(proto_file)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
