@@ -22,6 +22,8 @@ set(PLUGIN_FILES
 	${DISSECTOR_SRC}
 )
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf.cmake)
+
 set_source_files_properties(
 	${PLUGIN_FILES}
 	PROPERTIES
