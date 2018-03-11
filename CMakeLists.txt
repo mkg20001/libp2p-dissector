@@ -19,7 +19,7 @@ set(DISSECTOR_SRC
 
 set(PLUGIN_FILES
 	plugin.c
-	${CMAKE_CURRENT_SOURCE_DIR}/protos/secio.pb-c.c
+#	${CMAKE_CURRENT_SOURCE_DIR}/protos/secio.pb-c.c
 	${DISSECTOR_SRC}
 )
 
