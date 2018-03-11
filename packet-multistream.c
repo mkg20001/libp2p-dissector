@@ -119,55 +119,10 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if ( TEST_HEURISTICS_FAIL )
         return 0;
 #endif
-    /*** COLUMN DATA ***/
-
-    /* There are two normal columns to fill in: the 'Protocol' column which
-     * is narrow and generally just contains the constant string 'multistream',
-     * and the 'Info' column which can be much wider and contain misc. summary
-     * information (for example, the port number for TCP packets).
-     *
-     * If you are setting the column to a constant string, use "col_set_str()",
-     * as it's more efficient than the other "col_set_XXX()" calls.
-     *
-     * If
-     * - you may be appending to the column later OR
-     * - you have constructed the string locally OR
-     * - the string was returned from a call to val_to_str()
-     * then use "col_add_str()" instead, as that takes a copy of the string.
-     *
-     * The function "col_add_fstr()" can be used instead of "col_add_str()"; it
-     * takes "printf()"-like arguments. Don't use "col_add_fstr()" with a format
-     * string of "%s" - just use "col_add_str()" or "col_set_str()", as it's
-     * more efficient than "col_add_fstr()".
-     *
-     * For full details see section 1.4 of README.dissector.
-     */
 
     /* Set the Protocol column to the constant string of multistream */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "multistream");
     col_set_str(pinfo->cinfo, COL_INFO, "MS");
-
-#if 0
-    /* If you will be fetching any data from the packet before filling in
-     * the Info column, clear that column first in case the calls to fetch
-     * data from the packet throw an exception so that the Info column doesn't
-     * contain data left over from the previous dissector: */
-    col_clear(pinfo->cinfo, COL_INFO);
-#endif
-
-    /*** PROTOCOL TREE ***/
-
-    /* Now we will create a sub-tree for our protocol and start adding fields
-     * to display under that sub-tree. Most of the time the only functions you
-     * will need are proto_tree_add_item() and proto_item_add_subtree().
-     *
-     * NOTE: The offset and length values in the call to proto_tree_add_item()
-     * define what data bytes to highlight in the hex display window when the
-     * line in the protocol tree display corresponding to that item is selected.
-     *
-     * Supplying a length of -1 tells Wireshark to highlight all data from the
-     * offset to the end of the packet.
-     */
 
   conversation_t *conversation = find_or_create_conversation(pinfo);
   ms_conv_info_t* conv = (ms_conv_info_t *)conversation_get_proto_data(conversation, proto_multistream);
@@ -257,6 +212,30 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
   }
 
+  /*** COLUMN DATA ***/
+
+  /* There are two normal columns to fill in: the 'Protocol' column which
+   * is narrow and generally just contains the constant string 'multistream',
+   * and the 'Info' column which can be much wider and contain misc. summary
+   * information (for example, the port number for TCP packets).
+   *
+   * If you are setting the column to a constant string, use "col_set_str()",
+   * as it's more efficient than the other "col_set_XXX()" calls.
+   *
+   * If
+   * - you may be appending to the column later OR
+   * - you have constructed the string locally OR
+   * - the string was returned from a call to val_to_str()
+   * then use "col_add_str()" instead, as that takes a copy of the string.
+   *
+   * The function "col_add_fstr()" can be used instead of "col_add_str()"; it
+   * takes "printf()"-like arguments. Don't use "col_add_fstr()" with a format
+   * string of "%s" - just use "col_add_str()" or "col_set_str()", as it's
+   * more efficient than "col_add_fstr()".
+   *
+   * For full details see section 1.4 of README.dissector.
+   */
+
   if (pinfo->num == conv->helloPacket) {
     col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s)", conv->listenerMSVer);
   } else if (pinfo->num == conv->selectPacket) {
@@ -272,6 +251,20 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     col_set_str(pinfo->cinfo, COL_INFO, "Data");
     col_append_fstr(pinfo->cinfo, COL_INFO, " %i bytes", len);
   }
+
+  /*** PROTOCOL TREE ***/
+
+  /* Now we will create a sub-tree for our protocol and start adding fields
+   * to display under that sub-tree. Most of the time the only functions you
+   * will need are proto_tree_add_item() and proto_item_add_subtree().
+   *
+   * NOTE: The offset and length values in the call to proto_tree_add_item()
+   * define what data bytes to highlight in the hex display window when the
+   * line in the protocol tree display corresponding to that item is selected.
+   *
+   * Supplying a length of -1 tells Wireshark to highlight all data from the
+   * offset to the end of the packet.
+   */
 
   if (tree && !pinfo->desegment_len) {
     /* create display subtree for the protocol */
