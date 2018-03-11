@@ -57,32 +57,32 @@ static gint ett_multistream = -1;
 // #define multistream_MIN_LENGTH 8
 
 typedef struct _ms_conv_info_t {
-  gboolean handshaked;
-  address dialerAddr;
-  address listenerAddr;
-  gchar* listenerMSVer;
-  gchar* dialerMSVer;
-  gchar* protocol;
-  gboolean supported;
-  guint32 helloPacket;
-  guint32 selectPacket;
-  guint32 ackPacket;
+    gboolean handshaked;
+    address dialerAddr;
+    address listenerAddr;
+    gchar* listenerMSVer;
+    gchar* dialerMSVer;
+    gchar* protocol;
+    gboolean supported;
+    guint32 helloPacket;
+    guint32 selectPacket;
+    guint32 ackPacket;
 } ms_conv_info_t;
 
 /* Code to actually dissect the packets */
 static int
 dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-        void *data _U_)
+                    void *data _U_)
 {
-    /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item *ti; // , *expert_ti;
-    proto_tree *multistream_tree;
-    /* Other misc. local variables. */
-    guint       offset = 0;
-    int         len    = tvb_captured_length(tvb);
-    gboolean    raw    = 0;
+  /* Set up structures needed to add the protocol subtree and manage it */
+  proto_item *ti; // , *expert_ti;
+  proto_tree *multistream_tree;
+  /* Other misc. local variables. */
+  guint       offset = 0;
+  int         len    = tvb_captured_length(tvb);
+  gboolean    raw    = 0;
 #if 0
-    /*** HEURISTICS ***/
+  /*** HEURISTICS ***/
 
     /* First, if at all possible, do some heuristics to check if the packet
      * cannot possibly belong to your protocol.  This is especially important
@@ -116,9 +116,9 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         return 0;
 #endif
 
-    /* Set the Protocol column to the constant string of multistream */
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, "multistream");
-    col_set_str(pinfo->cinfo, COL_INFO, "MS");
+  /* Set the Protocol column to the constant string of multistream */
+  col_set_str(pinfo->cinfo, COL_PROTOCOL, "multistream");
+  col_set_str(pinfo->cinfo, COL_INFO, "MS");
 
   conversation_t *conversation = find_or_create_conversation(pinfo);
   ms_conv_info_t* conv = (ms_conv_info_t *)conversation_get_proto_data(conversation, proto_multistream);
@@ -309,7 +309,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   conversation_add_proto_data(conversation, proto_multistream, conv);
 
 #if 0
-    /* Add an item to the subtree, see section 1.5 of README.dissector for more
+  /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
     expert_ti = proto_tree_add_item(multistream_tree, hf_multistream_FIELDABBREV, tvb,
             offset, len, ENC_xxx);
@@ -320,15 +320,15 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         /* value of hf_multistream_FIELDABBREV isn't what's expected */
         expert_add_info(pinfo, expert_ti, &ei_multistream_EXPERTABBREV);
 #endif
-    /* Continue adding tree items to process the packet here... */
+  /* Continue adding tree items to process the packet here... */
 
-    /* If this protocol has a sub-dissector call it here, see section 1.8 of
-     * README.dissector for more information. */
+  /* If this protocol has a sub-dissector call it here, see section 1.8 of
+   * README.dissector for more information. */
 
-    /* Return the amount of data this dissector was able to dissect (which may
-     * or may not be the total captured packet as we return here). */
-    if (raw) return 0;
-    return tvb_captured_length(tvb);
+  /* Return the amount of data this dissector was able to dissect (which may
+   * or may not be the total captured packet as we return here). */
+  if (raw) return 0;
+  return tvb_captured_length(tvb);
 }
 
 /* Register the protocol with Wireshark.
@@ -339,70 +339,70 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 void
 proto_register_multistream(void)
 {
-    module_t        *multistream_module;
-    expert_module_t *expert_multistream;
+  module_t        *multistream_module;
+  expert_module_t *expert_multistream;
 
-    /* Setup list of header fields  See Section 1.5 of README.dissector for
-     * details. */
-    static hf_register_info hf[] = {
-      { &hf_multistream_protocol,
-              { "Protocol",    "multistream.protocol",
-                      FT_STRING,       BASE_NONE,      NULL,   0x0,
-                      "Protocol being negotiated on", HFILL }},
-      { &hf_multistream_dialer,
-              { "Dialer",    "multistream.dialer",
-                      FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
-                      "TRUE if the packet is sent from the dialer", HFILL }},
-      { &hf_multistream_listener,
-              { "Listener",    "multistream.listener",
-                      FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
-                      "TRUE if the packet is sent from the listener", HFILL }},
-      { &hf_multistream_handshake,
-              { "Handshake",    "multistream.handshake",
-                      FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
-                      "TRUE if the packet is part of the handshake process", HFILL }},
-      { &hf_multistream_version,
-              { "Version",    "multistream.version",
-                      FT_STRING,       BASE_NONE,      NULL,   0x0,
-                      "Multistream version used", HFILL }}
-    };
+  /* Setup list of header fields  See Section 1.5 of README.dissector for
+   * details. */
+  static hf_register_info hf[] = {
+          { &hf_multistream_protocol,
+                  { "Protocol",    "multistream.protocol",
+                          FT_STRING,       BASE_NONE,      NULL,   0x0,
+                          "Protocol being negotiated on", HFILL }},
+          { &hf_multistream_dialer,
+                  { "Dialer",    "multistream.dialer",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "TRUE if the packet is sent from the dialer", HFILL }},
+          { &hf_multistream_listener,
+                  { "Listener",    "multistream.listener",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "TRUE if the packet is sent from the listener", HFILL }},
+          { &hf_multistream_handshake,
+                  { "Handshake",    "multistream.handshake",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "TRUE if the packet is part of the handshake process", HFILL }},
+          { &hf_multistream_version,
+                  { "Version",    "multistream.version",
+                          FT_STRING,       BASE_NONE,      NULL,   0x0,
+                          "Multistream version used", HFILL }}
+  };
 
-    /* Setup protocol subtree array */
-    static gint *ett[] = {
-        &ett_multistream
-    };
+  /* Setup protocol subtree array */
+  static gint *ett[] = {
+          &ett_multistream
+  };
 
-    /* Setup protocol expert items */
-    static ei_register_info ei[] = {
-        /* { &ei_multistream_EXPERTABBREV,
-          { "multistream.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
-            "EXPERTDESCR", EXPFILL }
-        } */
-    };
+  /* Setup protocol expert items */
+  static ei_register_info ei[] = {
+          /* { &ei_multistream_EXPERTABBREV,
+            { "multistream.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
+              "EXPERTDESCR", EXPFILL }
+          } */
+  };
 
-    /* Register the protocol name and description */
-    proto_multistream = proto_register_protocol("Multistream 1.0.0",
-            "Multistream", "multistream");
+  /* Register the protocol name and description */
+  proto_multistream = proto_register_protocol("Multistream 1.0.0",
+                                              "Multistream", "multistream");
 
-    /* Required function calls to register the header fields and subtrees */
-    proto_register_field_array(proto_multistream, hf, array_length(hf));
-    proto_register_subtree_array(ett, array_length(ett));
+  /* Required function calls to register the header fields and subtrees */
+  proto_register_field_array(proto_multistream, hf, array_length(hf));
+  proto_register_subtree_array(ett, array_length(ett));
 
-    /* Required function calls to register expert items */
-    expert_multistream = expert_register_protocol(proto_multistream);
-    expert_register_field_array(expert_multistream, ei, array_length(ei));
+  /* Required function calls to register expert items */
+  expert_multistream = expert_register_protocol(proto_multistream);
+  expert_register_field_array(expert_multistream, ei, array_length(ei));
 
-    /* Register a preferences module (see section 2.6 of README.dissector
-     * for more details). Registration of a prefs callback is not required
-     * if there are no preferences that affect protocol registration (an example
-     * of a preference that would affect registration is a port preference).
-     * If the prefs callback is not needed, use NULL instead of
-     * proto_reg_handoff_multistream in the following.
-     */
-    multistream_module = prefs_register_protocol(proto_multistream,
-            proto_reg_handoff_multistream);
+  /* Register a preferences module (see section 2.6 of README.dissector
+   * for more details). Registration of a prefs callback is not required
+   * if there are no preferences that affect protocol registration (an example
+   * of a preference that would affect registration is a port preference).
+   * If the prefs callback is not needed, use NULL instead of
+   * proto_reg_handoff_multistream in the following.
+   */
+  multistream_module = prefs_register_protocol(proto_multistream,
+                                               proto_reg_handoff_multistream);
 #if 0
-    /* Register a preferences module under the preferences subtree.
+  /* Register a preferences module under the preferences subtree.
      * Only use this function instead of prefs_register_protocol (above) if you
      * want to group preferences of several protocols under one preferences
      * subtree.
@@ -415,16 +415,16 @@ proto_register_multistream(void)
     multistream_module = prefs_register_protocol_subtree(const char *subtree,
             proto_multistream, proto_reg_handoff_multistream);
 #endif
-    /* Register a simple example preference */
-    prefs_register_bool_preference(multistream_module, "show_hex",
-            "Display numbers in Hex",
-            "Enable to display numerical values in hexadecimal.",
-            &pref_hex);
+  /* Register a simple example preference */
+  prefs_register_bool_preference(multistream_module, "show_hex",
+                                 "Display numbers in Hex",
+                                 "Enable to display numerical values in hexadecimal.",
+                                 &pref_hex);
 
-    /* Register an example port preference */
-    prefs_register_uint_preference(multistream_module, "tcp.port", "multistream TCP Port",
-            " multistream TCP port if other than the default",
-            10, &tcp_port_pref);
+  /* Register an example port preference */
+  prefs_register_uint_preference(multistream_module, "tcp.port", "multistream TCP Port",
+                                 " multistream TCP port if other than the default",
+                                 10, &tcp_port_pref);
 }
 
 /* If this dissector uses sub-dissector registration add a registration routine.
@@ -445,35 +445,35 @@ proto_register_multistream(void)
 void
 proto_reg_handoff_multistream(void)
 {
-    static gboolean initialized = FALSE;
-    static dissector_handle_t multistream_handle;
-    static int current_port;
+  static gboolean initialized = FALSE;
+  static dissector_handle_t multistream_handle;
+  static int current_port;
 
-    if (!initialized) {
-        /* Use create_dissector_handle() to indicate that
-         * dissect_multistream() returns the number of bytes it dissected (or 0
-         * if it thinks the packet does not belong to Multistream 1.0.0).
-         */
-        multistream_handle = create_dissector_handle(dissect_multistream,
-                proto_multistream);
-        initialized = TRUE;
+  if (!initialized) {
+    /* Use create_dissector_handle() to indicate that
+     * dissect_multistream() returns the number of bytes it dissected (or 0
+     * if it thinks the packet does not belong to Multistream 1.0.0).
+     */
+    multistream_handle = create_dissector_handle(dissect_multistream,
+                                                 proto_multistream);
+    initialized = TRUE;
 
-    } else {
-        /* If you perform registration functions which are dependent upon
-         * prefs then you should de-register everything which was associated
-         * with the previous settings and re-register using the new prefs
-         * settings here. In general this means you need to keep track of
-         * the multistream_handle and the value the preference had at the time
-         * you registered.  The multistream_handle value and the value of the
-         * preference can be saved using local statics in this
-         * function (proto_reg_handoff).
-         */
-        dissector_delete_uint("tcp.port", current_port, multistream_handle);
-    }
+  } else {
+    /* If you perform registration functions which are dependent upon
+     * prefs then you should de-register everything which was associated
+     * with the previous settings and re-register using the new prefs
+     * settings here. In general this means you need to keep track of
+     * the multistream_handle and the value the preference had at the time
+     * you registered.  The multistream_handle value and the value of the
+     * preference can be saved using local statics in this
+     * function (proto_reg_handoff).
+     */
+    dissector_delete_uint("tcp.port", current_port, multistream_handle);
+  }
 
-    current_port = tcp_port_pref;
+  current_port = tcp_port_pref;
 
-    dissector_add_uint("tcp.port", current_port, multistream_handle);
+  dissector_add_uint("tcp.port", current_port, multistream_handle);
 }
 
 #if 0
@@ -499,7 +499,7 @@ proto_reg_handoff_multistream(void)
  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
  *
  * Local variables:
- * c-basic-offset: 4
+ * c-basic-offset: 2
  * tab-width: 8
  * indent-tabs-mode: nil
  * End:
