@@ -1,0 +1,27 @@
+# CMakeListsCustom.txt
+#
+# Wireshark - Network traffic analyzer
+# By Gerald Combs <gerald@wireshark.org>
+# Copyright 1998 Gerald Combs
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Add a list of your custom plugins SRC dir here including the path
+#
+
+set(CUSTOM_PLUGIN_SRC_DIR
+	plugins/epan/libp2p
+)
+
+#
+# Editor modelines  -  http://www.wireshark.org/tools/modelines.html
+#
+# Local variables:
+# c-basic-offset: 8
+# tab-width: 8
+# indent-tabs-mode: t
+# End:
+#
+# vi: set shiftwidth=8 tabstop=8 noexpandtab:
+# :indentSize=8:tabSize=8:noTabs=false:
+#
