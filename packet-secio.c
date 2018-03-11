@@ -27,6 +27,7 @@
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/prefs.h>    /* Include only as needed */
+#include <protos/secio.pb-c.h>
 
 #if 0
 /* IF AND ONLY IF your protocol dissector exposes code to other dissectors

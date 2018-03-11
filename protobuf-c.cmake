@@ -1,7 +1,8 @@
+# protobuf-c/build-cmake/CMakeLists.txt
+
 SET(PACKAGE protobuf-c)
 SET(PACKAGE_NAME protobuf-c)
 SET(PACKAGE_VERSION 1.3.0)
-
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR)
 
@@ -80,56 +81,6 @@ FUNCTION(GENERATE_TEST_SOURCES PROTO_FILE SRC HDR)
                    DEPENDS protoc-gen-c)
 ENDFUNCTION()
 
-
-#IF(CMAKE_BUILD_TYPE MATCHES Debug)
-#ENABLE_TESTING()
-
-#GENERATE_TEST_SOURCES(${TEST_DIR}/test.proto ${TEST_DIR}/test.pb-c.c ${TEST_DIR}/test.pb-c.h)
-
-#ADD_EXECUTABLE(test-generated-code ${TEST_DIR}/generated-code/test-generated-code.c ${TEST_DIR}/test.pb-c.c ${TEST_DIR}/test.pb-c.h )
-#TARGET_LINK_LIBRARIES(test-generated-code protobuf-c)
-
-
-#ADD_CUSTOM_COMMAND(OUTPUT ${TEST_DIR}/test-full.pb.cc ${TEST_DIR}/test-full.pb.h
-#                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
-#                   ARGS --cpp_out ${TEST_DIR} -I${MAIN_DIR} ${TEST_DIR}/test-full.proto)
-
-#GENERATE_TEST_SOURCES(${TEST_DIR}/test-full.proto ${TEST_DIR}/test-full.pb-c.c ${TEST_DIR}/test-full.pb-c.h)
-
-#ADD_EXECUTABLE(cxx-generate-packed-data ${TEST_DIR}/generated-code2/cxx-generate-packed-data.cc ${TEST_DIR}/test-full.pb.h ${TEST_DIR}/test-full.pb.cc)
-#TARGET_LINK_LIBRARIES(cxx-generate-packed-data ${PROTOBUF_LIBRARY})
-
-#FILE(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/t/generated-code2)
-#ADD_CUSTOM_COMMAND(OUTPUT ${TEST_DIR}/generated-code2/test-full-cxx-output.inc
-#                   COMMAND ${CMAKE_BINARY_DIR}/cxx-generate-packed-data ">t/generated-code2/test-full-cxx-output.inc"
-#                   DEPENDS cxx-generate-packed-data
-#                   )
-
-#GENERATE_TEST_SOURCES(${TEST_DIR}/test-optimized.proto ${TEST_DIR}/test-optimized.pb-c.c ${TEST_DIR}/test-optimized.pb-c.h)
-
-#ADD_EXECUTABLE(test-generated-code2 ${TEST_DIR}/generated-code2/test-generated-code2.c ${TEST_DIR}/generated-code2/test-full-cxx-output.inc ${TEST_DIR}/test-full.pb-c.h ${TEST_DIR}/test-full.pb-c.c ${TEST_DIR}/test-optimized.pb-c.h ${TEST_DIR}/test-optimized.pb-c.c)
-#TARGET_LINK_LIBRARIES(test-generated-code2 protobuf-c)
-
-
-
-#GENERATE_TEST_SOURCES(${TEST_DIR}/issue220/issue220.proto ${TEST_DIR}/issue220/issue220.pb-c.c ${TEST_DIR}/issue220/issue220.pb-c.h)
-#ADD_EXECUTABLE(test-issue220 ${TEST_DIR}/issue220/issue220.c ${TEST_DIR}/issue220/issue220.pb-c.c ${TEST_DIR}/issue220/issue220.pb-c.h)
-#TARGET_LINK_LIBRARIES(test-issue220 protobuf-c)
-
-#GENERATE_TEST_SOURCES(${TEST_DIR}/issue251/issue251.proto ${TEST_DIR}/issue251/issue251.pb-c.c ${TEST_DIR}/issue251/issue251.pb-c.h)
-#ADD_EXECUTABLE(test-issue251 ${TEST_DIR}/issue251/issue251.c ${TEST_DIR}/issue251/issue251.pb-c.c ${TEST_DIR}/issue251/issue251.pb-c.h)
-#TARGET_LINK_LIBRARIES(test-issue251 protobuf-c)
-
-#ADD_EXECUTABLE(test-version ${TEST_DIR}/version/version.c)
-#TARGET_LINK_LIBRARIES(test-version protobuf-c)
-
-#GENERATE_TEST_SOURCES(${TEST_DIR}/test-proto3.proto ${TEST_DIR}/test-proto3.pb-c.c ${TEST_DIR}/test-proto3.pb-c.h)
-#ADD_EXECUTABLE(test-generated-code3 ${TEST_DIR}/generated-code/test-generated-code.c ${TEST_DIR}/test-proto3.pb-c.c ${TEST_DIR}/test-proto3.pb-c.h)
-#TARGET_COMPILE_DEFINITIONS(test-generated-code3 PUBLIC -DPROTO3)
-#TARGET_LINK_LIBRARIES(test-generated-code3 protobuf-c)
-#
-#ENDIF()
-
 INSTALL(TARGETS protoc-gen-c protobuf-c RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 INSTALL(FILES ${MAIN_DIR}/protobuf-c/protobuf-c.h DESTINATION include/protobuf-c)
 INSTALL(FILES ${MAIN_DIR}/protobuf-c/protobuf-c.h DESTINATION include)
@@ -147,6 +98,5 @@ ADD_TEST(test-generated-code3 test-generated-code3)
 ADD_TEST(test-issue220 test-issue220)
 ADD_TEST(test-issue251 test-issue251)
 ADD_TEST(test-version test-version)
-
 
 INCLUDE(CPack)

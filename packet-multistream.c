@@ -23,7 +23,6 @@
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/conversation.h>
-#include <protos/secio.pb-c.h>
 
 #include "length-prefixed.h"
 
