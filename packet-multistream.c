@@ -186,12 +186,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     dialer = 1;
   }
 
-  if (tree) {
-  }
-
   if (!conv->handshaked) {
-    fprintf(stderr, "\naddr: %s, l: %i, d: %i, la: %s, da: %s\n", address_to_display(wmem_packet_scope(), &pinfo->src), listener, dialer, address_to_display(wmem_packet_scope(), &conv->listenerAddr), address_to_display(wmem_packet_scope(), &conv->dialerAddr));
-
     if (!conv->listenerAddr.len && !listener && !dialer) {
       copy_address_wmem(wmem_file_scope(), &conv->listenerAddr, &pinfo->src);
       listener = 1;
@@ -211,11 +206,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           gchar* proto = lp_decode(tvb, 0, &bytesCount);
           if (proto) {
             conv->listenerMSVer = g_strdup(proto);
-            col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s)", proto); // todo(mkg20001): figure out why pinfo->cinfo is null
             conv->helloPacket = pinfo->num;
-            /* if (tree) {
-              proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset, proto);
-            } */
           } else {
             pinfo->desegment_len = (guint32)bytesCount - len;
           }
