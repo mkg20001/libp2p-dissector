@@ -16,19 +16,19 @@
 
 #include <config.h>
 
-#if 0
 /* "System" includes used only as needed */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-...
-#endif
 
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/prefs.h>    /* Include only as needed */
+#include <epan/conversation.h>
+#include <epan/to_str.h>
 
 #include "packet-multistream.h"
+#include "length-prefixed.h"
 
 /* Prototypes */
 /* (Required to prevent [-Wmissing-prototypes] warnings */
@@ -42,7 +42,8 @@ static int hf_multistream_listener = -1;
 static int hf_multistream_dialer = -1;
 static int hf_multistream_handshake = -1;
 static int hf_multistream_data = -1;
-static expert_field ei_multistream_EXPERTABBREV = EI_INIT;
+static int hf_multistream_version = -1;
+// static expert_field ei_multistream_EXPERTABBREV = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
 static gboolean pref_hex = FALSE;
@@ -58,7 +59,16 @@ static gint ett_multistream = -1;
 /* A sample #define of the minimum length (in bytes) of the protocol data.
  * If data is received with fewer than this many bytes it is rejected by
  * the current dissector. */
-#define multistream_MIN_LENGTH 8
+// #define multistream_MIN_LENGTH 8
+
+typedef struct _ms_conv_info_t {
+  gboolean handshaked;
+  address dialerAddr;
+  address listenerAddr;
+  gchar* listenerMSVer;
+  gchar* dialerMSVer;
+  gchar* protocol;
+} ms_conv_info_t;
 
 /* Code to actually dissect the packets */
 static int
@@ -66,12 +76,12 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         void *data _U_)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item *ti, *expert_ti;
+    proto_item *ti; // , *expert_ti;
     proto_tree *multistream_tree;
     /* Other misc. local variables. */
     guint       offset = 0;
-    int         len    = 0;
-
+    int         len    = tvb_captured_length(tvb);
+#if 0
     /*** HEURISTICS ***/
 
     /* First, if at all possible, do some heuristics to check if the packet
@@ -104,7 +114,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * some other dissector a chance to dissect it. */
     if ( TEST_HEURISTICS_FAIL )
         return 0;
-
+#endif
     /*** COLUMN DATA ***/
 
     /* There are two normal columns to fill in: the 'Protocol' column which
@@ -131,6 +141,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* Set the Protocol column to the constant string of multistream */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "multistream");
+    col_set_str(pinfo->cinfo, COL_INFO, "MS");
 
 #if 0
     /* If you will be fetching any data from the packet before filling in
@@ -139,8 +150,6 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * contain data left over from the previous dissector: */
     col_clear(pinfo->cinfo, COL_INFO);
 #endif
-
-    col_set_str(pinfo->cinfo, COL_INFO, "XXX Request");
 
     /*** PROTOCOL TREE ***/
 
@@ -156,11 +165,113 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * offset to the end of the packet.
      */
 
+  conversation_t *conversation = find_or_create_conversation(pinfo);
+  ms_conv_info_t* conv = (ms_conv_info_t *)conversation_get_proto_data(conversation, proto_multistream);
+  if (!conv) {
+    conv = wmem_new(wmem_file_scope(), ms_conv_info_t);
+  }
+
+  gboolean listener = 0;
+  gboolean dialer = 0;
+
+  if (conv->listenerAddr.len && addresses_equal(&pinfo->src, &conv->listenerAddr)) {
+    listener = 1;
+  }
+
+  if (conv->dialerAddr.len && addresses_equal(&pinfo->src, &conv->dialerAddr)) {
+    dialer = 1;
+  }
+
+//  if (tree) {
     /* create display subtree for the protocol */
     ti = proto_tree_add_item(tree, proto_multistream, tvb, 0, -1, ENC_NA);
-
     multistream_tree = proto_item_add_subtree(ti, ett_multistream);
+//  }
 
+  if (conv->handshaked) {
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
+  } else {
+    fprintf(stderr, "\naddr: %s, l: %i, d: %i, la: %s, da: %s\n", address_to_display(wmem_packet_scope(), &pinfo->src), listener, dialer, address_to_display(wmem_packet_scope(), &conv->listenerAddr), address_to_display(wmem_packet_scope(), &conv->dialerAddr));
+
+    if (!conv->listenerAddr.len && !listener && !dialer) {
+      copy_address_wmem(wmem_file_scope(), &conv->listenerAddr, &pinfo->src);
+      /* fprintf(stderr, "%s->", address_to_display(wmem_packet_scope(), &pinfo->src));
+      fprintf(stderr, "%s", address_to_display(wmem_packet_scope(), &pinfo->dst));
+      fprintf(stderr, "@%s,l" ,address_to_display(wmem_packet_scope(), &conv->listenerAddr)); */
+      listener = 1;
+    }
+
+    if (!conv->dialerAddr.len && !listener && !dialer && !addresses_equal(&pinfo->src, &conv->listenerAddr)) {
+      copy_address_wmem(wmem_file_scope(), &conv->dialerAddr, &pinfo->src);
+      /* fprintf(stderr, "%s->", address_to_display(wmem_packet_scope(), &pinfo->src));
+      fprintf(stderr, "%s", address_to_display(wmem_packet_scope(), &pinfo->dst));
+      fprintf(stderr, "@%s,d" ,address_to_display(wmem_packet_scope(), &conv->dialerAddr)); */
+      dialer = 1;
+    }
+
+    if (listener) {
+      if (!conv->listenerMSVer) { // version message
+        if (len < 20) {
+          pinfo->desegment_len = (guint32)20 -len;
+        } else {
+          int bytesCount;
+          gchar* proto = lp_decode(tvb, 0, &bytesCount);
+          if (proto) {
+            conv->listenerMSVer = proto;
+            // col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s)", proto); // todo(mkg20001): figure out why pinfo->cinfo is null
+//              if (tree) {
+//            proto_tree_add_string_format(multistream_tree, hf_multistream_version, tvb, 0, offset, "%s", proto);
+//              }
+          } else {
+            pinfo->desegment_len = (guint32)bytesCount - len;
+          }
+        }
+      } else { // ack/nack
+
+      }
+    } else if (dialer) {
+      if (!conv->dialerMSVer) { // version message and select
+        if (len < 24) {
+          pinfo->desegment_len = (guint32)24 - len;
+        } else {
+          int bytesCount;
+          gchar *proto = lp_decode(tvb, 0, &bytesCount);
+          if (proto) {
+            offset += bytesCount;
+            int bytesCount2 = 0;
+            gchar *reqProto = lp_decode(tvb, 20, &bytesCount2);
+            if (reqProto) {
+              conv->dialerMSVer = proto;
+              conv->protocol = reqProto;
+              // col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s) select (%s)", proto, reqProto); // todo(mkg20001): figure out why pinfo->cinfo is null
+//              if (tree) {
+//                proto_tree_add_string_format(multistream_tree, hf_multistream_version, tvb, 0, offset, "%s", proto);
+//                proto_tree_add_string_format(multistream_tree, hf_multistream_protocol, tvb, 0, offset, "%s", reqProto);
+//              }
+            } else {
+              pinfo->desegment_len = (guint32)bytesCount2 - (len - offset);
+            }
+          } else {
+            pinfo->desegment_len = (guint32)bytesCount - len;
+          }
+        }
+      }
+    }
+  }
+
+  if (tree && !pinfo->desegment_len) {
+    if (dialer) {
+      PROTO_ITEM_SET_HIDDEN(proto_tree_add_boolean(multistream_tree, hf_multistream_dialer, tvb, 0, 0, 1));
+    }
+
+    if (listener) {
+      PROTO_ITEM_SET_HIDDEN(proto_tree_add_boolean(multistream_tree, hf_multistream_listener, tvb, 0, 0, 1));
+    }
+  }
+
+  conversation_add_proto_data(conversation, proto_multistream, conv);
+
+#if 0
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
     expert_ti = proto_tree_add_item(multistream_tree, hf_multistream_FIELDABBREV, tvb,
@@ -171,7 +282,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if ( TEST_EXPERT_condition )
         /* value of hf_multistream_FIELDABBREV isn't what's expected */
         expert_add_info(pinfo, expert_ti, &ei_multistream_EXPERTABBREV);
-
+#endif
     /* Continue adding tree items to process the packet here... */
 
     /* If this protocol has a sub-dissector call it here, see section 1.8 of
@@ -212,6 +323,10 @@ proto_register_multistream(void)
               { "Handshake",    "multistream.handshake",
                       FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
                       "TRUE if the packet is part of the handshake process", HFILL }},
+      { &hf_multistream_version,
+              { "Version",    "multistream.version",
+                      FT_STRING,       BASE_NONE,      NULL,   0x0,
+                      "Multistream version used", HFILL }},
       { &hf_multistream_data,
               { "Data",    "multistream.data",
                       FT_BYTES,       BASE_NONE,      NULL,   0x0,
@@ -225,10 +340,10 @@ proto_register_multistream(void)
 
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
-        { &ei_multistream_EXPERTABBREV,
+        /* { &ei_multistream_EXPERTABBREV,
           { "multistream.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
             "EXPERTDESCR", EXPFILL }
-        }
+        } */
     };
 
     /* Register the protocol name and description */
@@ -252,7 +367,7 @@ proto_register_multistream(void)
      */
     multistream_module = prefs_register_protocol(proto_multistream,
             proto_reg_handoff_multistream);
-
+#if 0
     /* Register a preferences module under the preferences subtree.
      * Only use this function instead of prefs_register_protocol (above) if you
      * want to group preferences of several protocols under one preferences
@@ -265,7 +380,7 @@ proto_register_multistream(void)
      */
     multistream_module = prefs_register_protocol_subtree(const char *subtree,
             proto_multistream, proto_reg_handoff_multistream);
-
+#endif
     /* Register a simple example preference */
     prefs_register_bool_preference(multistream_module, "show_hex",
             "Display numbers in Hex",
