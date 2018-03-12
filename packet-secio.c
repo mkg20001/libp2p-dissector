@@ -1,6 +1,6 @@
-/* packet-PROTOABBREV.c
- * Routines for PROTONAME dissection
- * Copyright 201x, YOUR_NAME <YOUR_EMAIL_ADDRESS>
+/* packet-secio.c
+ * Routines for Secure I/O dissection
+ * Copyright 201x, Maciej Krüger <mkg20001@gmail.com>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -32,46 +32,46 @@
 #if 0
 /* IF AND ONLY IF your protocol dissector exposes code to other dissectors
  * (which most dissectors don't need to do) then the 'public' prototypes and
- * data structures can go in the header file packet-PROTOABBREV.h. If not, then
+ * data structures can go in the header file packet-secio.h. If not, then
  * a header file is not needed at all and this #include statement can be
  * removed. */
-#include "packet-PROTOABBREV.h"
+#include "packet-secio.h"
 #endif
 
 /* Prototypes */
 /* (Required to prevent [-Wmissing-prototypes] warnings */
-void proto_reg_handoff_PROTOABBREV(void);
-void proto_register_PROTOABBREV(void);
+void proto_reg_handoff_secio(void);
+void proto_register_secio(void);
 
 /* Initialize the protocol and registered fields */
-static int proto_PROTOABBREV = -1;
-static int hf_PROTOABBREV_FIELDABBREV = -1;
-static expert_field ei_PROTOABBREV_EXPERTABBREV = EI_INIT;
+static int proto_secio = -1;
+static int hf_secio_FIELDABBREV = -1;
+static expert_field ei_secio_EXPERTABBREV = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
 static gboolean pref_hex = FALSE;
 /* Global sample port preference - real port preferences should generally
  * default to 0 unless there is an IANA-registered (or equivalent) port for your
  * protocol. */
-#define PROTOABBREV_TCP_PORT 1234
-static guint tcp_port_pref = PROTOABBREV_TCP_PORT;
+#define secio_TCP_PORT 1234
+static guint tcp_port_pref = secio_TCP_PORT;
 
 /* Initialize the subtree pointers */
-static gint ett_PROTOABBREV = -1;
+static gint ett_secio = -1;
 
 /* A sample #define of the minimum length (in bytes) of the protocol data.
  * If data is received with fewer than this many bytes it is rejected by
  * the current dissector. */
-#define PROTOABBREV_MIN_LENGTH 8
+#define secio_MIN_LENGTH 8
 
 /* Code to actually dissect the packets */
 static int
-dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
+dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         void *data _U_)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
     proto_item *ti, *expert_ti;
-    proto_tree *PROTOABBREV_tree;
+    proto_tree *secio_tree;
     /* Other misc. local variables. */
     guint       offset = 0;
     int         len    = 0;
@@ -90,7 +90,7 @@ dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      */
 
     /* Check that the packet is long enough for it to belong to us. */
-    if (tvb_reported_length(tvb) < PROTOABBREV_MIN_LENGTH)
+    if (tvb_reported_length(tvb) < secio_MIN_LENGTH)
         return 0;
 
     /* Check that there's enough data present to run the heuristics. If there
@@ -112,7 +112,7 @@ dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     /*** COLUMN DATA ***/
 
     /* There are two normal columns to fill in: the 'Protocol' column which
-     * is narrow and generally just contains the constant string 'PROTOABBREV',
+     * is narrow and generally just contains the constant string 'secio',
      * and the 'Info' column which can be much wider and contain misc. summary
      * information (for example, the port number for TCP packets).
      *
@@ -133,8 +133,8 @@ dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * For full details see section 1.4 of README.dissector.
      */
 
-    /* Set the Protocol column to the constant string of PROTOABBREV */
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, "PROTOABBREV");
+    /* Set the Protocol column to the constant string of secio */
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "secio");
 
 #if 0
     /* If you will be fetching any data from the packet before filling in
@@ -161,20 +161,20 @@ dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      */
 
     /* create display subtree for the protocol */
-    ti = proto_tree_add_item(tree, proto_PROTOABBREV, tvb, 0, -1, ENC_NA);
+    ti = proto_tree_add_item(tree, proto_secio, tvb, 0, -1, ENC_NA);
 
-    PROTOABBREV_tree = proto_item_add_subtree(ti, ett_PROTOABBREV);
+    secio_tree = proto_item_add_subtree(ti, ett_secio);
 
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
-    expert_ti = proto_tree_add_item(PROTOABBREV_tree, hf_PROTOABBREV_FIELDABBREV, tvb,
+    expert_ti = proto_tree_add_item(secio_tree, hf_secio_FIELDABBREV, tvb,
             offset, len, ENC_xxx);
     offset += len;
     /* Some fields or situations may require "expert" analysis that can be
      * specifically highlighted. */
     if ( TEST_EXPERT_condition )
-        /* value of hf_PROTOABBREV_FIELDABBREV isn't what's expected */
-        expert_add_info(pinfo, expert_ti, &ei_PROTOABBREV_EXPERTABBREV);
+        /* value of hf_secio_FIELDABBREV isn't what's expected */
+        expert_add_info(pinfo, expert_ti, &ei_secio_EXPERTABBREV);
 
     /* Continue adding tree items to process the packet here... */
 
@@ -192,16 +192,16 @@ dissect_PROTOABBREV(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
  * calls all the protocol registration.
  */
 void
-proto_register_PROTOABBREV(void)
+proto_register_secio(void)
 {
-    module_t        *PROTOABBREV_module;
-    expert_module_t *expert_PROTOABBREV;
+    module_t        *secio_module;
+    expert_module_t *expert_secio;
 
     /* Setup list of header fields  See Section 1.5 of README.dissector for
      * details. */
     static hf_register_info hf[] = {
-        { &hf_PROTOABBREV_FIELDABBREV,
-          { "FIELDNAME", "PROTOABBREV.FIELDABBREV",
+        { &hf_secio_FIELDABBREV,
+          { "FIELDNAME", "secio.FIELDABBREV",
             FT_FIELDTYPE, FIELDDISPLAY, FIELDCONVERT, BITMASK,
             "FIELDDESCR", HFILL }
         }
@@ -209,38 +209,38 @@ proto_register_PROTOABBREV(void)
 
     /* Setup protocol subtree array */
     static gint *ett[] = {
-        &ett_PROTOABBREV
+        &ett_secio
     };
 
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
-        { &ei_PROTOABBREV_EXPERTABBREV,
-          { "PROTOABBREV.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
+        { &ei_secio_EXPERTABBREV,
+          { "secio.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
             "EXPERTDESCR", EXPFILL }
         }
     };
 
     /* Register the protocol name and description */
-    proto_PROTOABBREV = proto_register_protocol("PROTONAME",
-            "PROTOSHORTNAME", "PROTOABBREV");
+    proto_secio = proto_register_protocol("Libp2p Secure Input/Output",
+            "Secure I/O", "secio");
 
     /* Required function calls to register the header fields and subtrees */
-    proto_register_field_array(proto_PROTOABBREV, hf, array_length(hf));
+    proto_register_field_array(proto_secio, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
     /* Required function calls to register expert items */
-    expert_PROTOABBREV = expert_register_protocol(proto_PROTOABBREV);
-    expert_register_field_array(expert_PROTOABBREV, ei, array_length(ei));
+    expert_secio = expert_register_protocol(proto_secio);
+    expert_register_field_array(expert_secio, ei, array_length(ei));
 
     /* Register a preferences module (see section 2.6 of README.dissector
      * for more details). Registration of a prefs callback is not required
      * if there are no preferences that affect protocol registration (an example
      * of a preference that would affect registration is a port preference).
      * If the prefs callback is not needed, use NULL instead of
-     * proto_reg_handoff_PROTOABBREV in the following.
+     * proto_reg_handoff_secio in the following.
      */
-    PROTOABBREV_module = prefs_register_protocol(proto_PROTOABBREV,
-            proto_reg_handoff_PROTOABBREV);
+    secio_module = prefs_register_protocol(proto_secio,
+            proto_reg_handoff_secio);
 
     /* Register a preferences module under the preferences subtree.
      * Only use this function instead of prefs_register_protocol (above) if you
@@ -249,21 +249,21 @@ proto_register_PROTOABBREV(void)
      *
      * Argument subtree identifies grouping tree node name, several subnodes can
      * be specified using slash '/' (e.g. "OSI/X.500" - protocol preferences
-     * will be accessible under Protocols->OSI->X.500-><PROTOSHORTNAME>
+     * will be accessible under Protocols->OSI->X.500-><Secure I/O>
      * preferences node.
      */
-    PROTOABBREV_module = prefs_register_protocol_subtree(const char *subtree,
-            proto_PROTOABBREV, proto_reg_handoff_PROTOABBREV);
+    secio_module = prefs_register_protocol_subtree(const char *subtree,
+            proto_secio, proto_reg_handoff_secio);
 
     /* Register a simple example preference */
-    prefs_register_bool_preference(PROTOABBREV_module, "show_hex",
+    prefs_register_bool_preference(secio_module, "show_hex",
             "Display numbers in Hex",
             "Enable to display numerical values in hexadecimal.",
             &pref_hex);
 
     /* Register an example port preference */
-    prefs_register_uint_preference(PROTOABBREV_module, "tcp.port", "PROTOABBREV TCP Port",
-            " PROTOABBREV TCP port if other than the default",
+    prefs_register_uint_preference(secio_module, "tcp.port", "secio TCP Port",
+            " secio TCP port if other than the default",
             10, &tcp_port_pref);
 }
 
@@ -283,19 +283,19 @@ proto_register_PROTOABBREV(void)
  * functions.
  */
 void
-proto_reg_handoff_PROTOABBREV(void)
+proto_reg_handoff_secio(void)
 {
     static gboolean initialized = FALSE;
-    static dissector_handle_t PROTOABBREV_handle;
+    static dissector_handle_t secio_handle;
     static int current_port;
 
     if (!initialized) {
         /* Use create_dissector_handle() to indicate that
-         * dissect_PROTOABBREV() returns the number of bytes it dissected (or 0
-         * if it thinks the packet does not belong to PROTONAME).
+         * dissect_secio() returns the number of bytes it dissected (or 0
+         * if it thinks the packet does not belong to Secure I/O).
          */
-        PROTOABBREV_handle = create_dissector_handle(dissect_PROTOABBREV,
-                proto_PROTOABBREV);
+        secio_handle = create_dissector_handle(dissect_secio,
+                proto_secio);
         initialized = TRUE;
 
     } else {
@@ -303,35 +303,35 @@ proto_reg_handoff_PROTOABBREV(void)
          * prefs then you should de-register everything which was associated
          * with the previous settings and re-register using the new prefs
          * settings here. In general this means you need to keep track of
-         * the PROTOABBREV_handle and the value the preference had at the time
-         * you registered.  The PROTOABBREV_handle value and the value of the
+         * the secio_handle and the value the preference had at the time
+         * you registered.  The secio_handle value and the value of the
          * preference can be saved using local statics in this
          * function (proto_reg_handoff).
          */
-        dissector_delete_uint("tcp.port", current_port, PROTOABBREV_handle);
+        dissector_delete_uint("tcp.port", current_port, secio_handle);
     }
 
     current_port = tcp_port_pref;
 
-    dissector_add_uint("tcp.port", current_port, PROTOABBREV_handle);
+    dissector_add_uint("tcp.port", current_port, secio_handle);
 }
 
 #if 0
 
-/* Simpler form of proto_reg_handoff_PROTOABBREV which can be used if there are
+/* Simpler form of proto_reg_handoff_secio which can be used if there are
  * no prefs-dependent registration function calls. */
 void
-proto_reg_handoff_PROTOABBREV(void)
+proto_reg_handoff_secio(void)
 {
-    dissector_handle_t PROTOABBREV_handle;
+    dissector_handle_t secio_handle;
 
-    /* Use create_dissector_handle() to indicate that dissect_PROTOABBREV()
+    /* Use create_dissector_handle() to indicate that dissect_secio()
      * returns the number of bytes it dissected (or 0 if it thinks the packet
-     * does not belong to PROTONAME).
+     * does not belong to Secure I/O).
      */
-    PROTOABBREV_handle = create_dissector_handle(dissect_PROTOABBREV,
-            proto_PROTOABBREV);
-    dissector_add_uint_with_preference("tcp.port", PROTOABBREV_TCP_PORT, PROTOABBREV_handle);
+    secio_handle = create_dissector_handle(dissect_secio,
+            proto_secio);
+    dissector_add_uint_with_preference("tcp.port", secio_TCP_PORT, secio_handle);
 }
 #endif
 

@@ -15,6 +15,7 @@ set_module_info(libp2p 0 0 1 0)
 set(DISSECTOR_SRC
 		length-prefixed.c
 		packet-multistream.c
+		packet-secio.c
 )
 
 set(PLUGIN_FILES
