@@ -20,7 +20,6 @@ set(DISSECTOR_SRC
 
 set(PLUGIN_FILES
 	plugin.c
-#	${CMAKE_CURRENT_SOURCE_DIR}/protos/secio.pb-c.c
 	${DISSECTOR_SRC}
 )
 
@@ -38,8 +37,9 @@ file(GLOB PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/protos/*.proto")
 macro(compile_proto_file filename)
 	get_filename_component(basename ${filename} NAME_WE)
 	add_custom_command(
-			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h
+#			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h
 			DEPENDS protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
+			TARGET compileProto PRE_BUILD
 			COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
 			--proto_path=${CMAKE_CURRENT_SOURCE_DIR}/protos
 			--plugin=$<TARGET_FILE:protoc-gen-c>
@@ -47,6 +47,7 @@ macro(compile_proto_file filename)
 	)
 endmacro(compile_proto_file)
 
+add_custom_target(compileProto)
 foreach(proto_file ${PROTOS})
 	compile_proto_file(${proto_file})
 endforeach(proto_file)
@@ -59,6 +60,7 @@ register_plugin_files(plugin.c
 )
 
 add_plugin_library(libp2p epan)
+add_dependencies(libp2p compileProto)
 
 target_link_libraries(libp2p epan)
 

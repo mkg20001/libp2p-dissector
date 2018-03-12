@@ -57,11 +57,24 @@ static gboolean pref_hex = FALSE;
 /* Global sample port preference - real port preferences should generally
  * default to 0 unless there is an IANA-registered (or equivalent) port for your
  * protocol. */
-#define secio_TCP_PORT 1234
+#define secio_TCP_PORT 4001
 static guint tcp_port_pref = secio_TCP_PORT;
 
 /* Initialize the subtree pointers */
 static gint ett_secio = -1;
+
+typedef struct _secio_conv_info_t {
+    address dialerAddr;
+    struct _secio_conn_state_t* dialerState;
+    address listenerAddr;
+    struct _secio_conn_state_t* listenerState;
+    gboolean handshaked;
+} secio_conv_info;
+
+typedef struct _secio_conn_state_t {
+    Propose propose;
+    Exchange exchange;
+} secio_conn_state_t;
 
 /* A sample #define of the minimum length (in bytes) of the protocol data.
  * If data is received with fewer than this many bytes it is rejected by
