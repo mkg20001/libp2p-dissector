@@ -45,7 +45,11 @@ void proto_register_secio(void);
 
 /* Initialize the protocol and registered fields */
 static int proto_secio = -1;
-static int hf_secio_FIELDABBREV = -1;
+static int hf_secio_dialer = -1;
+static int hf_secio_listener = -1;
+static int hf_secio_handshake = -1;
+static int hf_secio_data = -1;
+static int hf_secio_version = -1;
 static expert_field ei_secio_EXPERTABBREV = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
@@ -75,7 +79,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     /* Other misc. local variables. */
     guint       offset = 0;
     int         len    = 0;
-
+#if 0
     /*** HEURISTICS ***/
 
     /* First, if at all possible, do some heuristics to check if the packet
@@ -108,7 +112,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * some other dissector a chance to dissect it. */
     if ( TEST_HEURISTICS_FAIL )
         return 0;
-
+#endif
     /*** COLUMN DATA ***/
 
     /* There are two normal columns to fill in: the 'Protocol' column which
@@ -164,7 +168,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     ti = proto_tree_add_item(tree, proto_secio, tvb, 0, -1, ENC_NA);
 
     secio_tree = proto_item_add_subtree(ti, ett_secio);
-
+#if 0
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
     expert_ti = proto_tree_add_item(secio_tree, hf_secio_FIELDABBREV, tvb,
@@ -175,7 +179,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if ( TEST_EXPERT_condition )
         /* value of hf_secio_FIELDABBREV isn't what's expected */
         expert_add_info(pinfo, expert_ti, &ei_secio_EXPERTABBREV);
-
+#endif
     /* Continue adding tree items to process the packet here... */
 
     /* If this protocol has a sub-dissector call it here, see section 1.8 of
@@ -199,13 +203,28 @@ proto_register_secio(void)
 
     /* Setup list of header fields  See Section 1.5 of README.dissector for
      * details. */
-    static hf_register_info hf[] = {
-        { &hf_secio_FIELDABBREV,
-          { "FIELDNAME", "secio.FIELDABBREV",
-            FT_FIELDTYPE, FIELDDISPLAY, FIELDCONVERT, BITMASK,
-            "FIELDDESCR", HFILL }
-        }
-    };
+  static hf_register_info hf[] = {
+          { &hf_secio_dialer,
+                  { "Dialer",    "secio.dialer",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "TRUE if the packet is sent from the dialer", HFILL }},
+          { &hf_secio_listener,
+                  { "Listener",    "secio.listener",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "TRUE if the packet is sent from the listener", HFILL }},
+          { &hf_secio_handshake,
+                  { "Handshake",    "secio.handshake",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "TRUE if the packet is part of the handshake process", HFILL }},
+          { &hf_secio_data,
+                  { "Data",    "secio.data",
+                          FT_BYTES,       BASE_NONE,      NULL,   0x0,
+                          "Raw, decrypted bytes transferred", HFILL }},
+          { &hf_secio_version,
+                  { "Version",    "secio.version",
+                          FT_STRING,       BASE_NONE,      NULL,   0x0,
+                          "SECIO version used", HFILL }}
+  };
 
     /* Setup protocol subtree array */
     static gint *ett[] = {
@@ -241,7 +260,7 @@ proto_register_secio(void)
      */
     secio_module = prefs_register_protocol(proto_secio,
             proto_reg_handoff_secio);
-
+#if 0
     /* Register a preferences module under the preferences subtree.
      * Only use this function instead of prefs_register_protocol (above) if you
      * want to group preferences of several protocols under one preferences
@@ -254,7 +273,7 @@ proto_register_secio(void)
      */
     secio_module = prefs_register_protocol_subtree(const char *subtree,
             proto_secio, proto_reg_handoff_secio);
-
+#endif
     /* Register a simple example preference */
     prefs_register_bool_preference(secio_module, "show_hex",
             "Display numbers in Hex",
@@ -313,7 +332,8 @@ proto_reg_handoff_secio(void)
 
     current_port = tcp_port_pref;
 
-    dissector_add_uint("tcp.port", current_port, secio_handle);
+    //dissector_add_uint("tcp.port", current_port, secio_handle);
+  dissector_add_string("multistream.raw_protocol", "/secio/1.0.0", secio_handle);
 }
 
 #if 0

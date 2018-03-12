@@ -301,6 +301,9 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer); // at this point they are equal
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
       hidden = proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, offset, -1, ENC_NA);
+      PROTO_ITEM_SET_HIDDEN(hidden);
+      PROTO_ITEM_SET_GENERATED(hidden);
+      hidden = proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
     }
     if (hidden) {
       PROTO_ITEM_SET_HIDDEN(hidden);
@@ -351,6 +354,10 @@ proto_register_multistream(void)
                   { "Protocol",    "multistream.protocol",
                           FT_STRING,       BASE_NONE,      NULL,   0x0,
                           "Protocol being negotiated on", HFILL }},
+          { &hf_multistream_protocol,
+                  { "Raw Protocol",    "multistream.raw_protocol",
+                          FT_STRING,       BASE_NONE,      NULL,   0x0,
+                          "Protocol being negotiated on (only set on packets with raw data)", HFILL }},
           { &hf_multistream_dialer,
                   { "Dialer",    "multistream.dialer",
                           FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
