@@ -50,7 +50,7 @@ static int hf_secio_listener = -1;
 static int hf_secio_handshake = -1;
 static int hf_secio_data = -1;
 static int hf_secio_version = -1;
-static expert_field ei_secio_EXPERTABBREV = EI_INIT;
+// static expert_field ei_secio_EXPERTABBREV = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
 static gboolean pref_hex = FALSE;
@@ -74,11 +74,11 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         void *data _U_)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item *ti, *expert_ti;
+    proto_item *ti; //, *expert_ti;
     proto_tree *secio_tree;
     /* Other misc. local variables. */
-    guint       offset = 0;
-    int         len    = 0;
+    //guint       offset = 0;
+    //int         len    = 0;
 #if 0
     /*** HEURISTICS ***/
 
@@ -168,6 +168,8 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     ti = proto_tree_add_item(tree, proto_secio, tvb, 0, -1, ENC_NA);
 
     secio_tree = proto_item_add_subtree(ti, ett_secio);
+
+  proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA);
 #if 0
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
@@ -233,10 +235,10 @@ proto_register_secio(void)
 
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
-        { &ei_secio_EXPERTABBREV,
+        /* { &ei_secio_EXPERTABBREV,
           { "secio.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
             "EXPERTDESCR", EXPFILL }
-        }
+        } */
     };
 
     /* Register the protocol name and description */

@@ -34,6 +34,7 @@ void proto_register_multistream(void);
 /* Initialize the protocol and registered fields */
 static int proto_multistream = -1;
 static int hf_multistream_protocol = -1;
+static int hf_multistream_raw_protocol = -1;
 static int hf_multistream_listener = -1;
 static int hf_multistream_dialer = -1;
 static int hf_multistream_handshake = -1;
@@ -303,7 +304,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       hidden = proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, offset, -1, ENC_NA);
       PROTO_ITEM_SET_HIDDEN(hidden);
       PROTO_ITEM_SET_GENERATED(hidden);
-      hidden = proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+      hidden = proto_tree_add_string(multistream_tree, hf_multistream_raw_protocol, tvb, 0, offset, conv->protocol);
     }
     if (hidden) {
       PROTO_ITEM_SET_HIDDEN(hidden);
@@ -354,7 +355,7 @@ proto_register_multistream(void)
                   { "Protocol",    "multistream.protocol",
                           FT_STRING,       BASE_NONE,      NULL,   0x0,
                           "Protocol being negotiated on", HFILL }},
-          { &hf_multistream_protocol,
+          { &hf_multistream_raw_protocol,
                   { "Raw Protocol",    "multistream.raw_protocol",
                           FT_STRING,       BASE_NONE,      NULL,   0x0,
                           "Protocol being negotiated on (only set on packets with raw data)", HFILL }},
