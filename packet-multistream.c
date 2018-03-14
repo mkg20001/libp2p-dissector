@@ -25,6 +25,7 @@
 #include <epan/conversation.h>
 
 #include "length-prefixed.h"
+#include "addr-pair.h"
 
 /* Prototypes */
 /* (Required to prevent [-Wmissing-prototypes] warnings */
@@ -60,8 +61,8 @@ static gint ett_multistream = -1;
 
 typedef struct _ms_conv_info_t {
     gboolean handshaked;
-    address dialerAddr;
-    address listenerAddr;
+    addr_pair *dialer;
+    addr_pair *listener;
     gchar* listenerMSVer;
     gchar* dialerMSVer;
     gchar* protocol;
@@ -131,22 +132,17 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   gboolean listener = 0;
   gboolean dialer = 0;
 
-  if (conv->listenerAddr.len && addresses_equal(&pinfo->src, &conv->listenerAddr)) {
-    listener = 1;
-  }
-
-  if (conv->dialerAddr.len && addresses_equal(&pinfo->src, &conv->dialerAddr)) {
-    dialer = 1;
-  }
+  if (conv->listener && addrpair_cmp(pinfo, conv->listener)) listener = 1;
+  if (conv->dialer && addrpair_cmp(pinfo, conv->dialer)) dialer = 1;
 
   if (!conv->handshaked) {
-    if (!conv->listenerAddr.len && !listener && !dialer) {
-      copy_address_wmem(wmem_file_scope(), &conv->listenerAddr, &pinfo->src);
+    if (!conv->listener && !listener && !dialer) {
+      conv->listener = addrpair_store(pinfo);
       listener = 1;
     }
 
-    if (!conv->dialerAddr.len && !listener && !dialer && !addresses_equal(&pinfo->src, &conv->listenerAddr)) {
-      copy_address_wmem(wmem_file_scope(), &conv->dialerAddr, &pinfo->src);
+    if (!conv->dialer && !listener && !dialer && !addrpair_cmp(pinfo, conv->dialer)) {
+      conv->dialer = addrpair_store(pinfo);
       dialer = 1;
     }
 

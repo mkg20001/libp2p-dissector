@@ -72,8 +72,8 @@ typedef struct _secio_conv_info_t {
 } secio_conv_info;
 
 typedef struct _secio_conn_state_t {
-    Propose propose;
-    Exchange exchange;
+    struct _Propose* propose;
+    struct _Exchange* exchange;
 } secio_conn_state_t;
 
 /* A sample #define of the minimum length (in bytes) of the protocol data.

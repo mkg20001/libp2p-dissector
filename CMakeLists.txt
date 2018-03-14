@@ -13,6 +13,7 @@ include(WiresharkPlugin)
 set_module_info(libp2p 0 0 1 0)
 
 set(DISSECTOR_SRC
+		addr-pair.c
 		length-prefixed.c
 		packet-multistream.c
 		packet-secio.c
