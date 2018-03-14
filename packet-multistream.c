@@ -329,11 +329,10 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   /* If this protocol has a sub-dissector call it here, see section 1.8 of
    * README.dissector for more information. */
-  if (raw) dissector_try_string(subdissector_table, conv->protocol, tvb, pinfo, tree, NULL);
+  if (raw) return dissector_try_string(subdissector_table, conv->protocol, tvb, pinfo, tree, NULL);
 
   /* Return the amount of data this dissector was able to dissect (which may
    * or may not be the total captured packet as we return here). */
-  if (raw) return 0;
   return tvb_captured_length(tvb);
 }
 
