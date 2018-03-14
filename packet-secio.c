@@ -143,6 +143,8 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   secio_conv_info_t* conv = (secio_conv_info_t *)conversation_get_proto_data(conversation, proto_secio);
   if (!conv) {
     conv = wmem_new(wmem_file_scope(), secio_conv_info_t);
+    conv->dialer = NULL;
+    conv->listener = NULL;
   }
 
   gboolean listener = 0;

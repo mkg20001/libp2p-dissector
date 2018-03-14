@@ -134,7 +134,6 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   gboolean listener = 0;
   gboolean dialer = 0;
-  gboolean doSub = FALSE;
 
   if (conv->listener && addrpair_cmp(pinfo, conv->listener)) listener = 1;
   if (conv->dialer && addrpair_cmp(pinfo, conv->dialer)) dialer = 1;
@@ -305,7 +304,6 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       PROTO_ITEM_SET_HIDDEN(hidden);
       PROTO_ITEM_SET_GENERATED(hidden);
       hidden = proto_tree_add_string(multistream_tree, hf_multistream_raw_protocol, tvb, 0, offset, conv->protocol);
-      doSub = TRUE;
     }
     if (hidden) {
       PROTO_ITEM_SET_HIDDEN(hidden);
@@ -331,7 +329,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   /* If this protocol has a sub-dissector call it here, see section 1.8 of
    * README.dissector for more information. */
-  if (doSub) dissector_try_string(subdissector_table, conv->protocol, tvb, pinfo, tree, NULL);
+  if (raw) dissector_try_string(subdissector_table, conv->protocol, tvb, pinfo, tree, NULL);
 
   /* Return the amount of data this dissector was able to dissect (which may
    * or may not be the total captured packet as we return here). */
