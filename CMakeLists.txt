@@ -38,20 +38,17 @@ file(GLOB PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/protos/*.proto")
 macro(compile_proto_file filename)
 	get_filename_component(basename ${filename} NAME_WE)
 	add_custom_command(
-#			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h
+			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h
 			DEPENDS protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
-			TARGET compileProto PRE_BUILD
 			COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
 			--proto_path=${CMAKE_CURRENT_SOURCE_DIR}/protos
 			--plugin=$<TARGET_FILE:protoc-gen-c>
 			--c_out=${CMAKE_CURRENT_SOURCE_DIR}/protos
 	)
+	add_custom_target(compileProto${basename}
+			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h)
+	add_dependencies(libp2p compileProto${basename})
 endmacro(compile_proto_file)
-
-add_custom_target(compileProto)
-foreach(proto_file ${PROTOS})
-	compile_proto_file(${proto_file})
-endforeach(proto_file)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -61,7 +58,9 @@ register_plugin_files(plugin.c
 )
 
 add_plugin_library(libp2p epan)
-add_dependencies(libp2p compileProto)
+foreach(proto_file ${PROTOS})
+	compile_proto_file(${proto_file})
+endforeach(proto_file)
 
 target_link_libraries(libp2p epan)
 

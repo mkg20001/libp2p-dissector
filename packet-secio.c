@@ -28,6 +28,9 @@
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/prefs.h>    /* Include only as needed */
 #include <protos/secio.pb-c.h>
+#include <protos/key.pb-c.h>
+#include "length-prefixed.h"
+#include "addr-pair.h"
 
 #if 0
 /* IF AND ONLY IF your protocol dissector exposes code to other dissectors
@@ -64,9 +67,9 @@ static guint tcp_port_pref = secio_TCP_PORT;
 static gint ett_secio = -1;
 
 typedef struct _secio_conv_info_t {
-    address dialerAddr;
+    addr_pair* dialer;
     struct _secio_conn_state_t* dialerState;
-    address listenerAddr;
+    addr_pair* listener;
     struct _secio_conn_state_t* listenerState;
     gboolean handshaked;
 } secio_conv_info;

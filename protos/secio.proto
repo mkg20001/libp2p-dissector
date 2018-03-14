@@ -1,3 +1,5 @@
+// SRC https://raw.githubusercontent.com/libp2p/js-libp2p-secio/master/src/handshake/secio.proto.js
+
 message Propose {
   optional bytes rand = 1;
   optional bytes pubkey = 2;

@@ -1,0 +1,15 @@
+// SRC https://raw.githubusercontent.com/libp2p/js-libp2p-crypto/master/src/keys/keys.proto.js
+
+enum KeyType {
+  RSA = 0;
+  Ed25519 = 1;
+  Secp256k1 = 2;
+}
+message PublicKey {
+  required KeyType Type = 1;
+  required bytes Data = 2;
+}
+message PrivateKey {
+  required KeyType Type = 1;
+  required bytes Data = 2;
+}
