@@ -29,6 +29,8 @@
 #include <epan/prefs.h>    /* Include only as needed */
 #include <protos/secio.pb-c.h>
 #include <protos/key.pb-c.h>
+#include <epan/conversation.h>
+#include <stdio.h>
 #include "length-prefixed.h"
 #include "addr-pair.h"
 
@@ -72,11 +74,15 @@ typedef struct _secio_conv_info_t {
     addr_pair* listener;
     struct _secio_conn_state_t* listenerState;
     gboolean handshaked;
-} secio_conv_info;
+} secio_conv_info_t;
 
 typedef struct _secio_conn_state_t {
     struct _Propose* propose;
     struct _Exchange* exchange;
+    struct _PublicKey* key;
+    struct _PublicKey* ekey;
+    struct _PrivateKey* ePrivKey; // from session key dump
+    gchar* sharedSecret; // if we have one session key use the shared secret to generate it
 } secio_conn_state_t;
 
 /* A sample #define of the minimum length (in bytes) of the protocol data.
@@ -93,8 +99,8 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     proto_item *ti; //, *expert_ti;
     proto_tree *secio_tree;
     /* Other misc. local variables. */
-    //guint       offset = 0;
-    //int         len    = 0;
+    // guint       offset = 0;
+    int         len    = tvb_captured_length(tvb);
 #if 0
     /*** HEURISTICS ***/
 
@@ -129,63 +135,115 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if ( TEST_HEURISTICS_FAIL )
         return 0;
 #endif
-    /*** COLUMN DATA ***/
 
-    /* There are two normal columns to fill in: the 'Protocol' column which
-     * is narrow and generally just contains the constant string 'secio',
-     * and the 'Info' column which can be much wider and contain misc. summary
-     * information (for example, the port number for TCP packets).
-     *
-     * If you are setting the column to a constant string, use "col_set_str()",
-     * as it's more efficient than the other "col_set_XXX()" calls.
-     *
-     * If
-     * - you may be appending to the column later OR
-     * - you have constructed the string locally OR
-     * - the string was returned from a call to val_to_str()
-     * then use "col_add_str()" instead, as that takes a copy of the string.
-     *
-     * The function "col_add_fstr()" can be used instead of "col_add_str()"; it
-     * takes "printf()"-like arguments. Don't use "col_add_fstr()" with a format
-     * string of "%s" - just use "col_add_str()" or "col_set_str()", as it's
-     * more efficient than "col_add_fstr()".
-     *
-     * For full details see section 1.4 of README.dissector.
-     */
+  /* Set the Protocol column to the constant string of secio */
+  col_set_str(pinfo->cinfo, COL_PROTOCOL, "secio");
 
-    /* Set the Protocol column to the constant string of secio */
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, "secio");
+  conversation_t *conversation = find_or_create_conversation(pinfo);
+  secio_conv_info_t* conv = (secio_conv_info_t *)conversation_get_proto_data(conversation, proto_secio);
+  if (!conv) {
+    conv = wmem_new(wmem_file_scope(), secio_conv_info_t);
+  }
 
-#if 0
-    /* If you will be fetching any data from the packet before filling in
-     * the Info column, clear that column first in case the calls to fetch
-     * data from the packet throw an exception so that the Info column doesn't
-     * contain data left over from the previous dissector: */
-    col_clear(pinfo->cinfo, COL_INFO);
-#endif
+  gboolean listener = 0;
+  gboolean dialer = 0;
 
-    col_set_str(pinfo->cinfo, COL_INFO, "XXX Request");
+  if (conv->listener && addrpair_cmp(pinfo, conv->listener)) listener = 1;
+  if (conv->dialer && addrpair_cmp(pinfo, conv->dialer)) dialer = 1;
 
-    /*** PROTOCOL TREE ***/
+  if (!conv->handshaked) {
+    if (!conv->listener && !listener && !dialer) {
+      conv->listener = addrpair_store(pinfo);
+      listener = 1;
+    }
 
-    /* Now we will create a sub-tree for our protocol and start adding fields
-     * to display under that sub-tree. Most of the time the only functions you
-     * will need are proto_tree_add_item() and proto_item_add_subtree().
-     *
-     * NOTE: The offset and length values in the call to proto_tree_add_item()
-     * define what data bytes to highlight in the hex display window when the
-     * line in the protocol tree display corresponding to that item is selected.
-     *
-     * Supplying a length of -1 tells Wireshark to highlight all data from the
-     * offset to the end of the packet.
-     */
+    if (!conv->dialer && !listener && !dialer && !addrpair_cmp(pinfo, conv->dialer)) {
+      conv->dialer = addrpair_store(pinfo);
+      dialer = 1;
+    }
 
+    secio_conn_state_t *state;
+    if (dialer) state = conv->dialerState;
+    else state = conv->listenerState;
+
+    if (!state) {
+      state = wmem_new(wmem_file_scope(), secio_conn_state_t);
+      if (dialer) conv->dialerState = state;
+      else conv->listenerState = state;
+    }
+
+    int bytesCount;
+    gchar* buf;
+    if (!state->propose) {
+      buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
+      if (!buf) {
+        pinfo->desegment_len = (guint32)bytesCount - len;
+      } else {
+        state->propose = propose__unpack(NULL, (size_t)len, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+      }
+    } else if (!state->exchange) {
+      buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
+      if (!buf) {
+        pinfo->desegment_len = (guint32)bytesCount - len;
+      } else {
+        state->exchange = exchange__unpack(NULL, (size_t)len, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+      }
+    }
+  }
+
+  /*** COLUMN DATA ***/
+
+  /* There are two normal columns to fill in: the 'Protocol' column which
+   * is narrow and generally just contains the constant string 'multistream',
+   * and the 'Info' column which can be much wider and contain misc. summary
+   * information (for example, the port number for TCP packets).
+   *
+   * If you are setting the column to a constant string, use "col_set_str()",
+   * as it's more efficient than the other "col_set_XXX()" calls.
+   *
+   * If
+   * - you may be appending to the column later OR
+   * - you have constructed the string locally OR
+   * - the string was returned from a call to val_to_str()
+   * then use "col_add_str()" instead, as that takes a copy of the string.
+   *
+   * The function "col_add_fstr()" can be used instead of "col_add_str()"; it
+   * takes "printf()"-like arguments. Don't use "col_add_fstr()" with a format
+   * string of "%s" - just use "col_add_str()" or "col_set_str()", as it's
+   * more efficient than "col_add_fstr()".
+   *
+   * For full details see section 1.4 of README.dissector.
+   */
+
+  /* TODO: add */
+
+  /*** PROTOCOL TREE ***/
+
+  /* Now we will create a sub-tree for our protocol and start adding fields
+   * to display under that sub-tree. Most of the time the only functions you
+   * will need are proto_tree_add_item() and proto_item_add_subtree().
+   *
+   * NOTE: The offset and length values in the call to proto_tree_add_item()
+   * define what data bytes to highlight in the hex display window when the
+   * line in the protocol tree display corresponding to that item is selected.
+   *
+   * Supplying a length of -1 tells Wireshark to highlight all data from the
+   * offset to the end of the packet.
+   */
+
+  if (tree && !pinfo->desegment_len) {
     /* create display subtree for the protocol */
     ti = proto_tree_add_item(tree, proto_secio, tvb, 0, -1, ENC_NA);
 
     secio_tree = proto_item_add_subtree(ti, ett_secio);
 
-  proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA);
+    proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA);
+  }
+
+  conversation_add_proto_data(conversation, proto_secio, conv);
+
+  col_set_str(pinfo->cinfo, COL_INFO, "SECIO (WIP)");
+
 #if 0
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
@@ -237,7 +295,7 @@ proto_register_secio(void)
           { &hf_secio_data,
                   { "Data",    "secio.data",
                           FT_BYTES,       BASE_NONE,      NULL,   0x0,
-                          "Raw, decrypted bytes transferred", HFILL }},
+                          "Raw, decrypted bytes transferred (WIP)", HFILL }},
           { &hf_secio_version,
                   { "Version",    "secio.version",
                           FT_STRING,       BASE_NONE,      NULL,   0x0,
@@ -350,8 +408,7 @@ proto_reg_handoff_secio(void)
 
     current_port = tcp_port_pref;
 
-    //dissector_add_uint("tcp.port", current_port, secio_handle);
-  dissector_add_string("multistream.raw_protocol", "/secio/1.0.0", secio_handle);
+  dissector_add_string("multistream.protocol", "/secio/1.0.0", secio_handle);
 }
 
 #if 0

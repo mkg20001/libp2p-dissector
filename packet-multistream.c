@@ -23,6 +23,7 @@
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/conversation.h>
+#include <epan/capture_dissectors.h>
 
 #include "length-prefixed.h"
 #include "addr-pair.h"
@@ -71,6 +72,8 @@ typedef struct _ms_conv_info_t {
     guint32 selectPacket;
     guint32 ackPacket;
 } ms_conv_info_t;
+
+static dissector_table_t subdissector_table;
 
 /* Code to actually dissect the packets */
 static int
@@ -131,6 +134,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   gboolean listener = 0;
   gboolean dialer = 0;
+  gboolean doSub = FALSE;
 
   if (conv->listener && addrpair_cmp(pinfo, conv->listener)) listener = 1;
   if (conv->dialer && addrpair_cmp(pinfo, conv->dialer)) dialer = 1;
@@ -301,6 +305,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       PROTO_ITEM_SET_HIDDEN(hidden);
       PROTO_ITEM_SET_GENERATED(hidden);
       hidden = proto_tree_add_string(multistream_tree, hf_multistream_raw_protocol, tvb, 0, offset, conv->protocol);
+      doSub = TRUE;
     }
     if (hidden) {
       PROTO_ITEM_SET_HIDDEN(hidden);
@@ -326,6 +331,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   /* If this protocol has a sub-dissector call it here, see section 1.8 of
    * README.dissector for more information. */
+  if (doSub) dissector_try_string(subdissector_table, conv->protocol, tvb, pinfo, tree, NULL);
 
   /* Return the amount of data this dissector was able to dissect (which may
    * or may not be the total captured packet as we return here). */
@@ -341,6 +347,11 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 void
 proto_register_multistream(void)
 {
+
+  subdissector_table = register_dissector_table("multistream.protocol",
+                                                "Multistream Protocol", proto_multistream, FT_STRING, BASE_NONE);
+//  register_capture_dissector_table("multistream.protocol", "Multistream");
+
   module_t        *multistream_module;
   expert_module_t *expert_multistream;
 

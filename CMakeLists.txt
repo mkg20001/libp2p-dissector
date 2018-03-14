@@ -8,6 +8,8 @@
 #
 
 include(WiresharkPlugin)
+include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf-c.cmake)
 
 # Plugin name and version info (major minor micro extra)
 set_module_info(libp2p 0 0 1 0)
@@ -17,18 +19,22 @@ set(DISSECTOR_SRC
 		length-prefixed.c
 		packet-multistream.c
 		packet-secio.c
+		protos/secio.pb-c.c
+		protos/key.pb-c.c
 )
 
-set(PLUGIN_FILES
+set(PLUGIN_FILES_REAL
 	plugin.c
 	${DISSECTOR_SRC}
 )
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf-c.cmake)
+set(PLUGIN_FILES
+	${PLUGIN_FILES_REAL}
+	${PC_SOURCES}
+)
 
 set_source_files_properties(
-	${PLUGIN_FILES}
+	${PLUGIN_FILES_REAL}
 	PROPERTIES
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
@@ -63,6 +69,8 @@ foreach(proto_file ${PROTOS})
 endforeach(proto_file)
 
 target_link_libraries(libp2p epan)
+target_link_libraries(libp2p libprotobuf)
+target_link_libraries(libp2p protobuf-c)
 
 install_plugin(libp2p epan)
 

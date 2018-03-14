@@ -56,3 +56,26 @@ gchar* lp_decode_cut(tvbuff_t *tvb, const guint offset, int *bytesCount, int cut
 gchar* lp_decode(tvbuff_t *tvb, const guint offset, int *bytesCount) {
   return lp_decode_cut(tvb, offset, bytesCount, 0);
 }
+
+// Ported from https://github.com/nodejs/node/blob/1d2fd8b65bacaf4401450edc8ed529106cbcfc67/lib/internal/buffer.js#L360-L371
+guint32 readInt32Be(const char* data) { // TODO: check endiannes
+  return (guint32)((data[0] * 2^32) + (data[1] * 2^16) + (data[2] * 2^8) + (data[3]));
+}
+
+gchar* lp_decode_fixed_cut(tvbuff_t *tvb, const guint offset, const guint prefixLength, int *bytesCount, int cutBytes) {
+  *bytesCount = prefixLength;
+  if (!tvb_offset_exists(tvb, offset + prefixLength - 1)) {
+    return NULL;
+  }
+  guint8* pref = tvb_get_string_enc(wmem_file_scope(), tvb, offset, prefixLength, ENC_NA);
+  guint length;
+  length = readInt32Be(pref); // tvb_get_bits32(tvb, offset, prefixLength, ENC_NA);
+  *bytesCount = prefixLength + length;
+  if (!tvb_offset_exists(tvb, offset + *bytesCount - 1)) {
+    return NULL;
+  }
+  return tvb_format_text(tvb, offset + prefixLength, length - cutBytes);
+}
+gchar* lp_decode_fixed(tvbuff_t *tvb, const guint offset, const guint prefixLength, int *bytesCount) {
+  return lp_decode_fixed_cut(tvb, offset, prefixLength, bytesCount, 0);
+}
