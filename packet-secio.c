@@ -55,7 +55,7 @@ static int hf_secio_listener = -1;
 static int hf_secio_handshake = -1;
 static int hf_secio_data = -1;
 static int hf_secio_version = -1;
-// static expert_field ei_secio_EXPERTABBREV = EI_INIT;
+static expert_field ei_secio_pbuf_error = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
 static gboolean pref_hex = FALSE;
@@ -77,9 +77,9 @@ typedef struct _secio_conv_info_t {
 } secio_conv_info_t;
 
 typedef struct _secio_conn_state_t {
-    struct _Propose* propose;
+    Propose* propose;
     guint32 proposePacket;
-    struct _Exchange* exchange;
+    Exchange* exchange;
     guint32 exchangePacket;
     struct _PublicKey* key;
     struct _PublicKey* ekey;
@@ -190,7 +190,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        state->propose = propose__unpack(NULL, (size_t)len, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+        state->propose = propose__unpack(NULL, (size_t)bytesCount - 4, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
         state->proposePacket = pinfo->num;
       }
     } else if (!state->exchange) {
@@ -198,7 +198,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        state->exchange = exchange__unpack(NULL, (size_t)len, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+        state->exchange = exchange__unpack(NULL, (size_t)bytesCount - 4, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
         state->exchangePacket = pinfo->num;
       }
     }
@@ -256,7 +256,23 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     secio_tree = proto_item_add_subtree(ti, ett_secio);
 
-    proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA);
+    if (pinfo->num == state->proposePacket) {
+      if (state->propose) {
+        // TODO: add
+      } else {
+        expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA), &ei_secio_pbuf_error);
+      }
+    } else if (pinfo->num == state->exchangePacket) {
+      col_set_str(pinfo->cinfo, COL_INFO, "SECIO Exchange");
+      if (state->exchange) {
+        // TODO: add
+      } else {
+        expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA), &ei_secio_pbuf_error);
+      }
+    } else if (conv->handshaked) {
+      col_set_str(pinfo->cinfo, COL_INFO, "SECIO Data");
+      proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA);
+    }
   }
 
   conversation_add_proto_data(conversation, proto_secio, conv);
@@ -326,10 +342,7 @@ proto_register_secio(void)
 
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
-        /* { &ei_secio_EXPERTABBREV,
-          { "secio.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
-            "EXPERTDESCR", EXPFILL }
-        } */
+            { &ei_secio_pbuf_error, { "secio.protocolBuffers.malformed", PI_MALFORMED, PI_ERROR, "Protocol Buffers Object is malformed and couldn't be parsed", EXPFILL }}
     };
 
     /* Register the protocol name and description */
