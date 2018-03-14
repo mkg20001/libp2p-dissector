@@ -78,7 +78,9 @@ typedef struct _secio_conv_info_t {
 
 typedef struct _secio_conn_state_t {
     struct _Propose* propose;
+    guint32 proposePacket;
     struct _Exchange* exchange;
+    guint32 exchangePacket;
     struct _PublicKey* key;
     struct _PublicKey* ekey;
     struct _PrivateKey* ePrivKey; // from session key dump
@@ -149,6 +151,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   gboolean listener = 0;
   gboolean dialer = 0;
+  secio_conn_state_t *state = NULL;
 
   if (conv->listener && addrpair_cmp(pinfo, conv->listener)) listener = 1;
   if (conv->dialer && addrpair_cmp(pinfo, conv->dialer)) dialer = 1;
@@ -163,17 +166,23 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       conv->dialer = addrpair_store(pinfo);
       dialer = 1;
     }
+  }
 
-    secio_conn_state_t *state;
-    if (dialer) state = conv->dialerState;
-    else state = conv->listenerState;
+  if (!dialer && !listener) {
+    // fprintf(stderr, "Could not determine listener/dialer");
+    return 0;
+  }
 
-    if (!state) {
-      state = wmem_new(wmem_file_scope(), secio_conn_state_t);
-      if (dialer) conv->dialerState = state;
-      else conv->listenerState = state;
-    }
+  if (dialer) state = conv->dialerState;
+  else state = conv->listenerState;
 
+  if (!state) {
+    state = wmem_new(wmem_file_scope(), secio_conn_state_t);
+    if (dialer) conv->dialerState = state;
+    else conv->listenerState = state;
+  }
+
+  if (!conv->handshaked) {
     int bytesCount;
     gchar* buf;
     if (!state->propose) {
@@ -182,6 +191,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
         state->propose = propose__unpack(NULL, (size_t)len, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+        state->proposePacket = pinfo->num;
       }
     } else if (!state->exchange) {
       buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
@@ -189,6 +199,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
         state->exchange = exchange__unpack(NULL, (size_t)len, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+        state->exchangePacket = pinfo->num;
       }
     }
   }
@@ -217,7 +228,13 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
    * For full details see section 1.4 of README.dissector.
    */
 
-  /* TODO: add */
+  if (pinfo->num == state->proposePacket) {
+    col_set_str(pinfo->cinfo, COL_INFO, "SECIO Propose");
+  } else if (pinfo->num == state->exchangePacket) {
+    col_set_str(pinfo->cinfo, COL_INFO, "SECIO Exchange");
+  } else if (conv->handshaked) {
+    col_set_str(pinfo->cinfo, COL_INFO, "SECIO Data");
+  }
 
   /*** PROTOCOL TREE ***/
 
@@ -243,8 +260,6 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   }
 
   conversation_add_proto_data(conversation, proto_secio, conv);
-
-  col_set_str(pinfo->cinfo, COL_INFO, "SECIO (WIP)");
 
 #if 0
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
