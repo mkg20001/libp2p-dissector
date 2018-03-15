@@ -190,7 +190,8 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        state->propose = propose__unpack(NULL, (size_t)bytesCount - 4, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+        guint8* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
+        state->propose = propose__unpack(NULL, (size_t)bytesCount - 4, pbData);
         state->proposePacket = pinfo->num;
       }
     } else if (!state->exchange) {
@@ -198,7 +199,8 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        state->exchange = exchange__unpack(NULL, (size_t)bytesCount - 4, tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA));
+        guint8* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
+        state->exchange = exchange__unpack(NULL, (size_t)bytesCount - 4, pbData);
         state->exchangePacket = pinfo->num;
       }
     }
@@ -260,14 +262,14 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       if (state->propose) {
         // TODO: add
       } else {
-        expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA), &ei_secio_pbuf_error);
+        expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 4, -1, ENC_NA), &ei_secio_pbuf_error);
       }
     } else if (pinfo->num == state->exchangePacket) {
       col_set_str(pinfo->cinfo, COL_INFO, "SECIO Exchange");
       if (state->exchange) {
         // TODO: add
       } else {
-        expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA), &ei_secio_pbuf_error);
+        expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 4, -1, ENC_NA), &ei_secio_pbuf_error);
       }
     } else if (conv->handshaked) {
       col_set_str(pinfo->cinfo, COL_INFO, "SECIO Data");
