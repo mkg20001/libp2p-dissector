@@ -4,9 +4,14 @@ WIP
 
 ## Todo:
  - [x] Write dissector for multistream
- - [ ] Write dissector for secio
- - [ ] Write dissector for spdy
+    - [ ] Recursive multistream stack
+ - [ ] Write dissector for secio _WIP_
+    - [ ] Fix protobuf bugs
+    - [ ] Decryption using dumped keys
+ - [ ] Write dissector for spdy (spdyshark)
  - [ ] Write dissector for mplex
+ - [ ] Write dissector for yamux
+ - [ ] Add some IPFS protocols
 
 ## Development
 
