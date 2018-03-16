@@ -178,6 +178,8 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   if (!state) {
     state = wmem_new(wmem_file_scope(), secio_conn_state_t);
+    state->proposePacket = 0;
+    state->exchangePacket = 0;
     if (dialer) conv->dialerState = state;
     else conv->listenerState = state;
   }
@@ -185,23 +187,23 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   if (!conv->handshaked) {
     int bytesCount;
     gchar* buf;
-    if (!state->propose) {
+    if (!state->proposePacket) {
       buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        guint8* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
-        state->propose = propose__unpack(NULL, (size_t)bytesCount - 4, pbData);
+        uint8_t* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
         state->proposePacket = pinfo->num;
+        state->propose = propose__unpack(NULL, (size_t)bytesCount - 4, pbData);
       }
-    } else if (!state->exchange) {
+    } else if (!state->exchangePacket) {
       buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        guint8* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
-        state->exchange = exchange__unpack(NULL, (size_t)bytesCount - 4, pbData);
+        uint8_t* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
         state->exchangePacket = pinfo->num;
+        state->exchange = exchange__unpack(NULL, (size_t)bytesCount - 4, pbData);
       }
     }
   }
@@ -258,6 +260,18 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     secio_tree = proto_item_add_subtree(ti, ett_secio);
 
+    proto_item* hidden = NULL;
+    if (dialer) {
+      hidden = proto_tree_add_boolean(secio_tree, hf_secio_dialer, tvb, 0, 0, 1);
+    }
+    if (listener) {
+      hidden = proto_tree_add_boolean(secio_tree, hf_secio_listener, tvb, 0, 0, 1);
+    }
+    if (hidden) {
+      PROTO_ITEM_SET_HIDDEN(hidden);
+      PROTO_ITEM_SET_GENERATED(hidden);
+    }
+
     if (pinfo->num == state->proposePacket) {
       if (state->propose) {
         // TODO: add
@@ -265,14 +279,12 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 4, -1, ENC_NA), &ei_secio_pbuf_error);
       }
     } else if (pinfo->num == state->exchangePacket) {
-      col_set_str(pinfo->cinfo, COL_INFO, "SECIO Exchange");
       if (state->exchange) {
         // TODO: add
       } else {
         expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 4, -1, ENC_NA), &ei_secio_pbuf_error);
       }
     } else if (conv->handshaked) {
-      col_set_str(pinfo->cinfo, COL_INFO, "SECIO Data");
       proto_tree_add_item(secio_tree, hf_secio_data, tvb, 0, -1, ENC_NA);
     }
   }
