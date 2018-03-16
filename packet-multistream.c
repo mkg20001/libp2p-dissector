@@ -73,6 +73,10 @@ typedef struct _ms_conv_info_t {
     guint32 ackPacket;
 } ms_conv_info_t;
 
+typedef struct _ms_conv_stack_t { // multistream is going to be used repeatedly in one conversation so we have to attach a stack to the conversation
+    wmem_map_t *stack;
+} ms_conv_stack_t;
+
 static dissector_table_t subdissector_table;
 
 /* Code to actually dissect the packets */
@@ -127,9 +131,17 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   col_set_str(pinfo->cinfo, COL_INFO, "MS");
 
   conversation_t *conversation = find_or_create_conversation(pinfo);
-  ms_conv_info_t* conv = (ms_conv_info_t *)conversation_get_proto_data(conversation, proto_multistream);
+  ms_conv_stack_t* stack = (ms_conv_stack_t *)conversation_get_proto_data(conversation, proto_multistream);
+  if (!stack) {
+    stack = wmem_new(wmem_file_scope(), ms_conv_stack_t);
+    stack->stack = wmem_map_new(wmem_file_scope(), g_direct_hash, g_direct_equal);
+    conversation_add_proto_data(conversation, proto_multistream, stack);
+  }
+  ms_conv_info_t* conv = (ms_conv_info_t *)wmem_map_lookup(stack->stack, GUINT_TO_POINTER(pinfo->curr_layer_num));
+  fprintf(stderr, "Layer %i, Packet %i, Exists %i\n", pinfo->curr_layer_num, pinfo->num, conv != NULL);
   if (!conv) {
     conv = wmem_new(wmem_file_scope(), ms_conv_info_t);
+    wmem_map_insert(stack->stack, GUINT_TO_POINTER(pinfo->curr_layer_num), conv);
   }
 
   gboolean listener = 0;
@@ -311,8 +323,6 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
   }
 
-  conversation_add_proto_data(conversation, proto_multistream, conv);
-
 #if 0
   /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
@@ -492,6 +502,7 @@ proto_reg_handoff_multistream(void)
   current_port = tcp_port_pref;
 
   dissector_add_uint("tcp.port", current_port, multistream_handle);
+  dissector_add_string("multistream.protocol", "/plaintext/1.0.0", multistream_handle);
 }
 
 #if 0
