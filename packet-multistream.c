@@ -23,9 +23,6 @@
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/conversation.h>
-#include <epan/to_str.h>
-#include <epan/capture_dissectors.h>
-
 #include "length-prefixed.h"
 #include "addr-pair.h"
 
@@ -172,8 +169,6 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   if (conv->listener && addrpair_cmp(pinfo, conv->listener)) listener = 1;
   if (conv->dialer && addrpair_cmp(pinfo, conv->dialer)) dialer = 1;
-
-  fprintf(stderr, ", Type %s n=%s\n", dialer ? "d" : "l", (dialer || listener) ? "Y" : "N");
 
   if (!conv->handshaked) {
     if (!conv->listener && !listener && !dialer) {

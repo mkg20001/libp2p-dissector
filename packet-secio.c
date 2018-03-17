@@ -193,16 +193,16 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        uint8_t* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
+        guint8* pbData = tvb_get_raw_string(wmem_packet_scope(), tvb, 4, bytesCount - 4);
         state->proposePacket = pinfo->num;
-        state->propose = propose__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, pbData);
+        state->propose = propose__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, (uint8_t *)pbData);
       }
     } else if (!state->exchangePacket) {
       buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
       if (!buf) {
         pinfo->desegment_len = (guint32)bytesCount - len;
       } else {
-        uint8_t* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
+        guint8* pbData = tvb_get_raw_string(wmem_packet_scope(), tvb, 4, bytesCount - 4);
         state->exchangePacket = pinfo->num;
         state->exchange = exchange__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, pbData);
       }
