@@ -76,9 +76,17 @@ typedef struct _ms_conv_info_t {
 
 typedef struct _ms_conv_stack_t { // multistream is going to be used repeatedly in one conversation so we have to attach a stack to the conversation
     wmem_map_t *stack;
+    guint32 rememberPacket;
+    guint32 rememberLayer;
 } ms_conv_stack_t;
 
 static dissector_table_t subdissector_table;
+
+void dsgRemember(ms_conv_stack_t *stack, packet_info *pinfo, guint32 dsgLen) { // note: this solves the reassembly layer shift bug BUT if more than one fragmented multistream command is in one packet it will cause havoc
+  pinfo->desegment_len = dsgLen;
+  stack->rememberPacket = pinfo->num;
+  stack->rememberLayer = pinfo->curr_layer_num;
+}
 
 /* Code to actually dissect the packets */
 static int
@@ -133,16 +141,19 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   conversation_t *conversation = find_or_create_conversation(pinfo);
   ms_conv_stack_t* stack = (ms_conv_stack_t *)conversation_get_proto_data(conversation, proto_multistream);
+  guint32 curLayer;
   if (!stack) {
     stack = wmem_new(wmem_file_scope(), ms_conv_stack_t);
     stack->stack = wmem_map_new(wmem_file_scope(), g_direct_hash, g_direct_equal);
     conversation_add_proto_data(conversation, proto_multistream, stack);
   }
-  ms_conv_info_t* conv = (ms_conv_info_t *)wmem_map_lookup(stack->stack, GUINT_TO_POINTER(6)); // TODO: reassembly messes with layer numbers
-  fprintf(stderr, "Layer %i, Packet %i, Exists %i", pinfo->curr_layer_num, pinfo->num, conv != NULL);
+  curLayer = pinfo->curr_layer_num;
+  if (stack->rememberPacket == pinfo->num && stack->rememberLayer != curLayer) curLayer = stack->rememberLayer; // fix shifts introduced by reassembly
+  ms_conv_info_t* conv = (ms_conv_info_t *)wmem_map_lookup(stack->stack, GUINT_TO_POINTER(curLayer));
+
   if (!conv) {
     conv = wmem_new(wmem_file_scope(), ms_conv_info_t);
-    wmem_map_insert(stack->stack, GUINT_TO_POINTER(6), (void *)conv);
+    wmem_map_insert(stack->stack, GUINT_TO_POINTER(curLayer), (void *)conv);
     // ZERO IT OUT!
     conv->handshaked = FALSE;
     conv->dialer = NULL;
@@ -178,7 +189,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (listener) {
       if (!conv->listenerMSVer) { // version message
         if (len < 20) {
-          pinfo->desegment_len = (guint32)20 -len;
+          dsgRemember(stack, pinfo, (guint32)20 - len);
         } else {
           int bytesCount;
           gchar* proto = lp_decode_cut(tvb, 0, &bytesCount, 1);
@@ -186,12 +197,12 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             conv->listenerMSVer = g_strdup(proto);
             conv->helloPacket = pinfo->num;
           } else {
-            pinfo->desegment_len = (guint32)bytesCount - len;
+            dsgRemember(stack, pinfo, (guint32)bytesCount - len);
           }
         }
       } else { // ack/nack
         if (len < 1) {
-          pinfo->desegment_len = 1;
+          dsgRemember(stack, pinfo, 1);
         } else {
           int bytesCount;
           gchar* resProto = lp_decode_cut(tvb, 0, &bytesCount, 1);
@@ -205,14 +216,14 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
               col_append_fstr(pinfo->cinfo, COL_INFO, " ACK (%s)", resProto);
             }
           } else {
-            pinfo->desegment_len = (guint32)bytesCount - len;
+            dsgRemember(stack, pinfo, (guint32)bytesCount - len);
           }
         }
       }
     } else if (dialer) {
       if (!conv->dialerMSVer) { // version message and select
         if (len < 21) {
-          pinfo->desegment_len = (guint32)21 - len;
+          dsgRemember(stack, pinfo, (guint32)21 - len);
         } else {
           int bytesCount;
           gchar *proto = lp_decode_cut(tvb, 0, &bytesCount, 1);
@@ -225,10 +236,10 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
               conv->protocol = g_strdup(reqProto);
               conv->selectPacket = pinfo->num;
             } else {
-              pinfo->desegment_len = (guint32)bytesCount2 - (len - offset);
+              dsgRemember(stack, pinfo, (guint32)bytesCount2 - (len - offset));
             }
           } else {
-            pinfo->desegment_len = (guint32)bytesCount - len;
+            dsgRemember(stack, pinfo, (guint32)bytesCount - len);
           }
         }
       }
@@ -270,7 +281,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       col_append_fstr(pinfo->cinfo, COL_INFO, " ACK (%s)", conv->protocol);
     }
   } else if (conv->handshaked) {
-//    col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
     col_set_str(pinfo->cinfo, COL_INFO, "Data");
     if (len == 1) {
       col_append_str(pinfo->cinfo, COL_INFO, " 1 byte");
