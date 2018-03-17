@@ -23,6 +23,7 @@
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/conversation.h>
+#include <epan/to_str.h>
 #include <epan/capture_dissectors.h>
 
 #include "length-prefixed.h"
@@ -138,10 +139,12 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     conversation_add_proto_data(conversation, proto_multistream, stack);
   }
   ms_conv_info_t* conv = (ms_conv_info_t *)wmem_map_lookup(stack->stack, GUINT_TO_POINTER(pinfo->curr_layer_num));
-  fprintf(stderr, "Layer %i, Packet %i, Exists %i\n", pinfo->curr_layer_num, pinfo->num, conv != NULL);
+  fprintf(stderr, "Layer %i, Packet %i, Exists %i", pinfo->curr_layer_num, pinfo->num, conv != NULL);
   if (!conv) {
     conv = wmem_new(wmem_file_scope(), ms_conv_info_t);
-    wmem_map_insert(stack->stack, GUINT_TO_POINTER(pinfo->curr_layer_num), conv);
+    wmem_map_insert(stack->stack, GUINT_TO_POINTER(pinfo->curr_layer_num), (void *)conv);
+    conv->listenerMSVer = NULL;
+    conv->dialerMSVer = NULL;
   }
 
   gboolean listener = 0;
@@ -150,14 +153,16 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   if (conv->listener && addrpair_cmp(pinfo, conv->listener)) listener = 1;
   if (conv->dialer && addrpair_cmp(pinfo, conv->dialer)) dialer = 1;
 
+  fprintf(stderr, ", Type %s n=%s\n", dialer ? "d" : "l", (dialer || listener) ? "Y" : "N");
+
   if (!conv->handshaked) {
     if (!conv->listener && !listener && !dialer) {
-      conv->listener = addrpair_store(pinfo);
+      conv->listener = addrpair_create(wmem_file_scope(), pinfo);
       listener = 1;
     }
 
     if (!conv->dialer && !listener && !dialer && !addrpair_cmp(pinfo, conv->dialer)) {
-      conv->dialer = addrpair_store(pinfo);
+      conv->dialer = addrpair_create(wmem_file_scope(), pinfo);
       dialer = 1;
     }
 

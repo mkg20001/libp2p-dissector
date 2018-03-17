@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include "length-prefixed.h"
 #include "addr-pair.h"
+#include "proto-util.h"
 
 #if 0
 /* IF AND ONLY IF your protocol dissector exposes code to other dissectors
@@ -158,12 +159,12 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   if (!conv->handshaked) {
     if (!conv->listener && !listener && !dialer) {
-      conv->listener = addrpair_store(pinfo);
+      conv->listener = addrpair_create(wmem_file_scope(), pinfo);
       listener = 1;
     }
 
     if (!conv->dialer && !listener && !dialer && !addrpair_cmp(pinfo, conv->dialer)) {
-      conv->dialer = addrpair_store(pinfo);
+      conv->dialer = addrpair_create(wmem_file_scope(), pinfo);
       dialer = 1;
     }
   }
@@ -194,7 +195,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       } else {
         uint8_t* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
         state->proposePacket = pinfo->num;
-        state->propose = propose__unpack(NULL, (size_t)bytesCount - 4, pbData);
+        state->propose = propose__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, pbData);
       }
     } else if (!state->exchangePacket) {
       buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
@@ -203,7 +204,7 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       } else {
         uint8_t* pbData = tvb_get_string_enc(wmem_file_scope(), tvb, 4, bytesCount - 4, ENC_NA);
         state->exchangePacket = pinfo->num;
-        state->exchange = exchange__unpack(NULL, (size_t)bytesCount - 4, pbData);
+        state->exchange = exchange__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, pbData);
       }
     }
   }
