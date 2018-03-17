@@ -20,7 +20,7 @@ wmem_pbuf_free(void *allocator_data, void *data)
   return wmem_free((wmem_allocator_t *)allocator_data, data);
 }
 
-// This one is a private func from tvbuff.h. we need it for pbufs so let's c&p it here.
+// This one is a private func from tvbuff.c. we need it for pbufs so let's c&p it here
 guint8 *
 tvb_get_raw_string(wmem_allocator_t *scope, tvbuff_t *tvb, const gint offset, const gint length)
 {

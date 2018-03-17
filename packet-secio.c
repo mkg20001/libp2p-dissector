@@ -82,9 +82,9 @@ typedef struct _secio_conn_state_t {
     guint32 proposePacket;
     Exchange* exchange;
     guint32 exchangePacket;
-    struct _PublicKey* key;
-    struct _PublicKey* ekey;
-    struct _PrivateKey* ePrivKey; // from session key dump
+    PublicKey* key;
+    PublicKey* ekey;
+    PrivateKey* ePrivKey; // from session key dump
     gchar* sharedSecret; // if we have one session key use the shared secret to generate it
 } secio_conn_state_t;
 
@@ -195,7 +195,10 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       } else {
         guint8* pbData = tvb_get_raw_string(wmem_packet_scope(), tvb, 4, bytesCount - 4);
         state->proposePacket = pinfo->num;
-        state->propose = propose__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, (uint8_t *)pbData);
+        state->propose = propose__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, pbData);
+        if (state->propose && state->propose->has_pubkey) {
+          state->key = public_key__unpack(pbuf_alloc(wmem_file_scope()), state->propose->pubkey.len, state->propose->pubkey.data);
+        }
       }
     } else if (!state->exchangePacket) {
       buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
@@ -205,6 +208,9 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         guint8* pbData = tvb_get_raw_string(wmem_packet_scope(), tvb, 4, bytesCount - 4);
         state->exchangePacket = pinfo->num;
         state->exchange = exchange__unpack(pbuf_alloc(wmem_file_scope()), (size_t)bytesCount - 4, pbData);
+        if (state->exchange && state->exchange->has_epubkey) {
+          state->ekey = public_key__unpack(pbuf_alloc(wmem_file_scope()), state->exchange->epubkey.len, state->exchange->epubkey.data);
+        }
       }
     }
   }
