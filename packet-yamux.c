@@ -26,6 +26,16 @@
 #include <epan/packet.h>   /* Should be first Wireshark include (other than config.h) */
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/prefs.h>    /* Include only as needed */
+#include <stdio.h>
+
+#define TYPE_DATA          0x00
+#define TYPE_WINDOW_UPDATE 0x01
+#define TYPE_PING          0x02
+#define TYPE_GO_AWAY       0x03
+#define FLAG_SYN           0x01
+#define FLAG_ACK           0x02
+#define FLAG_FIN           0x04
+#define FLAG_RST           0x08
 
 #if 0
 /* IF AND ONLY IF your protocol dissector exposes code to other dissectors
@@ -43,8 +53,12 @@ void proto_register_yamux(void);
 
 /* Initialize the protocol and registered fields */
 static int proto_yamux = -1;
-static int hf_yamux_FIELDABBREV = -1;
-static expert_field ei_yamux_EXPERTABBREV = EI_INIT;
+static int hf_yamux_version = -1;
+static int hf_yamux_type = -1;
+static int hf_yamux_flags = -1;
+static int hf_yamux_streamid = -1;
+static int hf_yamux_length = -1;
+//static expert_field ei_yamux_EXPERTABBREV = EI_INIT;
 
 /* Global sample preference ("controls" display of numbers) */
 static gboolean pref_hex = FALSE;
@@ -60,7 +74,7 @@ static gint ett_yamux = -1;
 /* A sample #define of the minimum length (in bytes) of the protocol data.
  * If data is received with fewer than this many bytes it is rejected by
  * the current dissector. */
-#define yamux_MIN_LENGTH 8
+#define yamux_MIN_LENGTH 12
 
 /* Code to actually dissect the packets */
 static int
@@ -68,11 +82,11 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         void *data _U_)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
-    proto_item *ti, *expert_ti;
+    proto_item *ti; //, *expert_ti;
     proto_tree *yamux_tree;
     /* Other misc. local variables. */
     guint       offset = 0;
-    int         len    = 0;
+    guint32     len    = tvb_captured_length(tvb);
 
     /*** HEURISTICS ***/
 
@@ -91,21 +105,30 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (tvb_reported_length(tvb) < yamux_MIN_LENGTH)
         return 0;
 
-    /* Check that there's enough data present to run the heuristics. If there
-     * isn't, reject the packet; it will probably be dissected as data and if
-     * the user wants it dissected despite it being short they can use the
-     * "Decode-As" functionality. If your heuristic needs to look very deep into
-     * the packet you may not want to require *all* data to be present, but you
-     * should ensure that the heuristic does not access beyond the captured
-     * length of the packet regardless. */
-    if (tvb_captured_length(tvb) < MAX_NEEDED_FOR_HEURISTICS)
-        return 0;
+  /* Protocol
+   * Version  - 8 bits
+   * Type     - 8 bits
+   * Flags    - 16 bits
+   * StreamID - 32 bits
+   * Length   - 32 bits
+   */
+  guint8 version = tvb_get_bits8(tvb, offset * 8, 8);
+  offset++;
+  guint8 type = tvb_get_bits8(tvb, offset * 8, 8);
+  offset++;
+  guint16 flags = tvb_get_bits16(tvb, offset * 8, 16, ENC_NA);
+  offset+=2;
+  guint32 streamid = tvb_get_bits32(tvb, offset * 8, 32, ENC_NA);
+  offset+=4;
+  guint32 length = tvb_get_bits32(tvb, offset * 8, 32, ENC_NA);
+//  guint32 length = tvb_get_guint32(tvb, offset, ENC_NA);
+  offset+=4;
+  DISSECTOR_ASSERT(offset == 12);
+  if (len < length + 12 && type == TYPE_DATA) { // reassemble packet TODO: fix
+    pinfo->desegment_len = (guint32)(length - (len - 12));
+    return 0;
+  }
 
-    /* Fetch some values from the packet header using tvb_get_*(). If these
-     * values are not valid/possible in your protocol then return 0 to give
-     * some other dissector a chance to dissect it. */
-    if ( TEST_HEURISTICS_FAIL )
-        return 0;
 
     /*** COLUMN DATA ***/
 
@@ -142,7 +165,7 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     col_clear(pinfo->cinfo, COL_INFO);
 #endif
 
-    col_set_str(pinfo->cinfo, COL_INFO, "XXX Request");
+    col_set_str(pinfo->cinfo, COL_INFO, "Yamux");
 
     /*** PROTOCOL TREE ***/
 
@@ -163,6 +186,13 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     yamux_tree = proto_item_add_subtree(ti, ett_yamux);
 
+  proto_tree_add_uint(yamux_tree, hf_yamux_version, tvb, 0, 1, version);
+  proto_tree_add_uint(yamux_tree, hf_yamux_type, tvb, 1, 1, type);
+  proto_tree_add_uint(yamux_tree, hf_yamux_flags, tvb, 2, 2, flags);
+  proto_tree_add_uint(yamux_tree, hf_yamux_streamid, tvb, 4, 4, streamid);
+  proto_tree_add_uint(yamux_tree, hf_yamux_length, tvb, 8, 4, length);
+
+#if 0
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
      * information. */
     expert_ti = proto_tree_add_item(yamux_tree, hf_yamux_FIELDABBREV, tvb,
@@ -173,7 +203,7 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if ( TEST_EXPERT_condition )
         /* value of hf_yamux_FIELDABBREV isn't what's expected */
         expert_add_info(pinfo, expert_ti, &ei_yamux_EXPERTABBREV);
-
+#endif
     /* Continue adding tree items to process the packet here... */
 
     /* If this protocol has a sub-dissector call it here, see section 1.8 of
@@ -198,11 +228,26 @@ proto_register_yamux(void)
     /* Setup list of header fields  See Section 1.5 of README.dissector for
      * details. */
     static hf_register_info hf[] = {
-        { &hf_yamux_FIELDABBREV,
-          { "FIELDNAME", "yamux.FIELDABBREV",
-            FT_FIELDTYPE, FIELDDISPLAY, FIELDCONVERT, BITMASK,
-            "FIELDDESCR", HFILL }
-        }
+            { &hf_yamux_version,
+                    { "Version",    "yamux.version",
+                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            "Version field", HFILL }},
+            { &hf_yamux_type,
+                    { "Type",    "yamux.type",
+                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            "Type field", HFILL }},
+            { &hf_yamux_flags,
+                    { "Flags",    "yamux.flags",
+                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            "Flags", HFILL }},
+            { &hf_yamux_streamid,
+                    { "StreamID",    "yamux.streamID",
+                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            "StreamID", HFILL }},
+            { &hf_yamux_length,
+                    { "Length",    "yamux.length",
+                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            "Data Length", HFILL }}
     };
 
     /* Setup protocol subtree array */
@@ -212,10 +257,10 @@ proto_register_yamux(void)
 
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
-        { &ei_yamux_EXPERTABBREV,
+        /* { &ei_yamux_EXPERTABBREV,
           { "yamux.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
             "EXPERTDESCR", EXPFILL }
-        }
+        } */
     };
 
     /* Register the protocol name and description */
@@ -240,6 +285,7 @@ proto_register_yamux(void)
     yamux_module = prefs_register_protocol(proto_yamux,
             proto_reg_handoff_yamux);
 
+#if 0
     /* Register a preferences module under the preferences subtree.
      * Only use this function instead of prefs_register_protocol (above) if you
      * want to group preferences of several protocols under one preferences
@@ -252,7 +298,7 @@ proto_register_yamux(void)
      */
     yamux_module = prefs_register_protocol_subtree(const char *subtree,
             proto_yamux, proto_reg_handoff_yamux);
-
+#endif
     /* Register a simple example preference */
     prefs_register_bool_preference(yamux_module, "show_hex",
             "Display numbers in Hex",
@@ -311,7 +357,7 @@ proto_reg_handoff_yamux(void)
 
     current_port = tcp_port_pref;
 
-    dissector_add_uint("tcp.port", current_port, yamux_handle);
+    dissector_add_string("multistream.protocol", "/yamux/1.0.0", yamux_handle);
 }
 
 #if 0
