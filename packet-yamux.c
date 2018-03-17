@@ -238,15 +238,15 @@ proto_register_yamux(void)
                             "Type field", HFILL }},
             { &hf_yamux_flags,
                     { "Flags",    "yamux.flags",
-                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            FT_UINT16,       BASE_DEC,      NULL,   0x0,
                             "Flags", HFILL }},
             { &hf_yamux_streamid,
                     { "StreamID",    "yamux.streamID",
-                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            FT_UINT32,       BASE_DEC,      NULL,   0x0,
                             "StreamID", HFILL }},
             { &hf_yamux_length,
                     { "Length",    "yamux.length",
-                            FT_UINT8,       BASE_DEC,      NULL,   0x0,
+                            FT_UINT32,       BASE_DEC,      NULL,   0x0,
                             "Data Length", HFILL }}
     };
 
