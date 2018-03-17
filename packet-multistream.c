@@ -138,13 +138,22 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     stack->stack = wmem_map_new(wmem_file_scope(), g_direct_hash, g_direct_equal);
     conversation_add_proto_data(conversation, proto_multistream, stack);
   }
-  ms_conv_info_t* conv = (ms_conv_info_t *)wmem_map_lookup(stack->stack, GUINT_TO_POINTER(pinfo->curr_layer_num));
+  ms_conv_info_t* conv = (ms_conv_info_t *)wmem_map_lookup(stack->stack, GUINT_TO_POINTER(6)); // TODO: reassembly messes with layer numbers
   fprintf(stderr, "Layer %i, Packet %i, Exists %i", pinfo->curr_layer_num, pinfo->num, conv != NULL);
   if (!conv) {
     conv = wmem_new(wmem_file_scope(), ms_conv_info_t);
-    wmem_map_insert(stack->stack, GUINT_TO_POINTER(pinfo->curr_layer_num), (void *)conv);
+    wmem_map_insert(stack->stack, GUINT_TO_POINTER(6), (void *)conv);
+    // ZERO IT OUT!
+    conv->handshaked = FALSE;
+    conv->dialer = NULL;
+    conv->listener = NULL;
     conv->listenerMSVer = NULL;
     conv->dialerMSVer = NULL;
+    conv->protocol = NULL;
+    conv->supported = FALSE;
+    conv->helloPacket = FALSE;
+    conv->selectPacket = FALSE;
+    conv->ackPacket = FALSE;
   }
 
   gboolean listener = 0;
@@ -261,7 +270,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       col_append_fstr(pinfo->cinfo, COL_INFO, " ACK (%s)", conv->protocol);
     }
   } else if (conv->handshaked) {
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
+//    col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
     col_set_str(pinfo->cinfo, COL_INFO, "Data");
     if (len == 1) {
       col_append_str(pinfo->cinfo, COL_INFO, " 1 byte");
@@ -304,23 +313,23 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     hidden = NULL;
 
     if (pinfo->num == conv->helloPacket) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer);
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, -1,  conv->listenerMSVer);
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (pinfo->num == conv->selectPacket) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->dialerMSVer);
-      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 20,  conv->dialerMSVer);
+      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 21, -1, conv->protocol);
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (pinfo->num == conv->ackPacket) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer);
-      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 0,  conv->listenerMSVer);
+      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, -1, conv->protocol);
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (conv->handshaked) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, offset,  conv->listenerMSVer); // at this point they are equal
-      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, offset, conv->protocol);
-      hidden = proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, offset, -1, ENC_NA);
+      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 0,  conv->listenerMSVer); // at this point they are equal
+      proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, 0, conv->protocol);
+      hidden = proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, 0, -1, ENC_NA);
       PROTO_ITEM_SET_HIDDEN(hidden);
       PROTO_ITEM_SET_GENERATED(hidden);
-      hidden = proto_tree_add_string(multistream_tree, hf_multistream_raw_protocol, tvb, 0, offset, conv->protocol);
+      hidden = proto_tree_add_string(multistream_tree, hf_multistream_raw_protocol, tvb, 0, 0, conv->protocol);
     }
     if (hidden) {
       PROTO_ITEM_SET_HIDDEN(hidden);
