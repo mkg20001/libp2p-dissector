@@ -8,7 +8,7 @@ WIP
  - [ ] Write dissector for secio _WIP_
     - [x] Fix protobuf bugs
     - [ ] Decryption using dumped keys
- - [ ] Write dissector for spdy (spdyshark)
+ - [ ] Write dissector for spdy (use spdyshark?)
  - [ ] Write dissector for mplex
  - [ ] Write dissector for yamux
  - [ ] Add some IPFS protocols
