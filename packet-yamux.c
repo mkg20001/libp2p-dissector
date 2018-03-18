@@ -142,15 +142,42 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   proto_tree_add_uint(yamux_tree, hf_yamux_streamid, tvb, 4, 4, streamid);
   proto_tree_add_uint(yamux_tree, hf_yamux_length, tvb, 8, 4, length);
 
+  if (type == TYPE_DATA) {
+    col_append_str(pinfo->cinfo, COL_INFO, "Data");
+
+    if (len < length + offset) { // reassemble packet TODO: fix
+      pinfo->desegment_len = (guint32)(length - (len - offset));
+      return len;
+    }
+
+    // Prepare new packet
+    tvbuff_t *tvb_data = tvb_clone_offset_len(tvb, 12, length);
+    add_new_data_source(pinfo, tvb_data, "Yamux Muxed Data");
+#if 0
+    // Save current values
+    gboolean saved_use_endpoint = pinfo->use_endpoint;
+    struct endpoint* orig_end = pinfo->conv_endpoint;
+
+    // Prepare fake ones
+    struct endpoint* fake_end = (struct endpoint *)wmem_memdup(wmem_packet_scope(), (void *)orig_end, sizeof(orig_end));
+
+    // Apply
+    pinfo->use_endpoint = TRUE;
+    pinfo->conv_endpoint = fake_end; // TODO: hijack conversation data so every muxed conn gets its own conversation
+#endif
+    // Dissect
+    dissector_handle_t handle = dissector_get_default_string_handle("multistream.protocol", "/plaintext/1.0.0");
+    int outLen = call_dissector(handle, tvb_data, pinfo, tree);
+#if 0
+    // Restore
+    pinfo->conv_endpoint = orig_end; // restore conversation
+    pinfo->use_endpoint = saved_use_endpoint;
+#endif
+    // Finish
+    return outLen; // return dissector value
+  }
+
   switch(type) {
-    case TYPE_DATA:
-      col_append_str(pinfo->cinfo, COL_INFO, "Data");
-      if (len < length + offset) { // reassemble packet TODO: fix
-        pinfo->desegment_len = (guint32)(length - (len - offset));
-        return len;
-      }
-      // TODO: hijack conversation data so every muxed conn gets its own conversation
-      break;
     case TYPE_WINDOW_UPDATE:
       col_append_str(pinfo->cinfo, COL_INFO, "Window Update");
       break;
