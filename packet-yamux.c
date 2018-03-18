@@ -105,6 +105,16 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (tvb_reported_length(tvb) < yamux_MIN_LENGTH)
         return 0;
 
+  /* Set the Protocol column to the constant string of yamux */
+  col_set_str(pinfo->cinfo, COL_PROTOCOL, "yamux");
+
+  col_set_str(pinfo->cinfo, COL_INFO, "Yamux ");
+
+  /* create display subtree for the protocol */
+  ti = proto_tree_add_item(tree, proto_yamux, tvb, 0, -1, ENC_NA);
+
+  yamux_tree = proto_item_add_subtree(ti, ett_yamux);
+
   /* Protocol
    * Version  - 8 bits
    * Type     - 8 bits
@@ -124,9 +134,34 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 //  guint32 length = tvb_get_guint32(tvb, offset, ENC_NA);
   offset+=4;
   DISSECTOR_ASSERT(offset == 12);
-  if (len < length + 12 && type == TYPE_DATA) { // reassemble packet TODO: fix
-    pinfo->desegment_len = (guint32)(length - (len - 12));
-    return 0;
+
+  proto_tree_add_uint(yamux_tree, hf_yamux_version, tvb, 0, 1, version);
+  proto_tree_add_uint(yamux_tree, hf_yamux_type, tvb, 1, 1, type);
+  proto_tree_add_uint(yamux_tree, hf_yamux_flags, tvb, 2, 2, flags);
+  proto_tree_add_uint(yamux_tree, hf_yamux_streamid, tvb, 4, 4, streamid);
+  proto_tree_add_uint(yamux_tree, hf_yamux_length, tvb, 8, 4, length);
+
+  switch(type) {
+    case TYPE_DATA:
+      col_append_str(pinfo->cinfo, COL_INFO, "Data");
+      if (len < length + offset && pinfo->desegment_len) { // reassemble packet TODO: fix and re-enable
+        pinfo->desegment_len = (guint32)(length - (len - offset));
+        return 0;
+      }
+      // TODO: hijack conversation data so every muxed conn gets its own conversation
+      break;
+    case TYPE_WINDOW_UPDATE:
+      col_append_str(pinfo->cinfo, COL_INFO, "Window Update");
+      break;
+    case TYPE_PING:
+      col_append_str(pinfo->cinfo, COL_INFO, "Ping");
+      break;
+    case TYPE_GO_AWAY:
+      col_append_str(pinfo->cinfo, COL_INFO, "Session End");
+      break;
+    default:
+      DISSECTOR_ASSERT(FALSE);
+      break;
   }
 
 
@@ -154,9 +189,6 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * For full details see section 1.4 of README.dissector.
      */
 
-    /* Set the Protocol column to the constant string of yamux */
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, "yamux");
-
 #if 0
     /* If you will be fetching any data from the packet before filling in
      * the Info column, clear that column first in case the calls to fetch
@@ -164,8 +196,6 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * contain data left over from the previous dissector: */
     col_clear(pinfo->cinfo, COL_INFO);
 #endif
-
-    col_set_str(pinfo->cinfo, COL_INFO, "Yamux");
 
     /*** PROTOCOL TREE ***/
 
@@ -180,17 +210,6 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * Supplying a length of -1 tells Wireshark to highlight all data from the
      * offset to the end of the packet.
      */
-
-    /* create display subtree for the protocol */
-    ti = proto_tree_add_item(tree, proto_yamux, tvb, 0, -1, ENC_NA);
-
-    yamux_tree = proto_item_add_subtree(ti, ett_yamux);
-
-  proto_tree_add_uint(yamux_tree, hf_yamux_version, tvb, 0, 1, version);
-  proto_tree_add_uint(yamux_tree, hf_yamux_type, tvb, 1, 1, type);
-  proto_tree_add_uint(yamux_tree, hf_yamux_flags, tvb, 2, 2, flags);
-  proto_tree_add_uint(yamux_tree, hf_yamux_streamid, tvb, 4, 4, streamid);
-  proto_tree_add_uint(yamux_tree, hf_yamux_length, tvb, 8, 4, length);
 
 #if 0
     /* Add an item to the subtree, see section 1.5 of README.dissector for more
@@ -211,7 +230,7 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* Return the amount of data this dissector was able to dissect (which may
      * or may not be the total captured packet as we return here). */
-    return tvb_captured_length(tvb);
+    return offset;
 }
 
 /* Register the protocol with Wireshark.
