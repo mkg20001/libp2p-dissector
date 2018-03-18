@@ -134,6 +134,7 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 //  guint32 length = tvb_get_guint32(tvb, offset, ENC_NA);
   offset+=4;
   DISSECTOR_ASSERT(offset == 12);
+  DISSECTOR_ASSERT(version == 0);
 
   proto_tree_add_uint(yamux_tree, hf_yamux_version, tvb, 0, 1, version);
   proto_tree_add_uint(yamux_tree, hf_yamux_type, tvb, 1, 1, type);
@@ -144,9 +145,9 @@ dissect_yamux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   switch(type) {
     case TYPE_DATA:
       col_append_str(pinfo->cinfo, COL_INFO, "Data");
-      if (len < length + offset && pinfo->desegment_len) { // reassemble packet TODO: fix and re-enable
+      if (len < length + offset) { // reassemble packet TODO: fix
         pinfo->desegment_len = (guint32)(length - (len - offset));
-        return 0;
+        return len;
       }
       // TODO: hijack conversation data so every muxed conn gets its own conversation
       break;
