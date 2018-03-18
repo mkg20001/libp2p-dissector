@@ -40,7 +40,8 @@ static int hf_multistream_dialer = -1;
 static int hf_multistream_handshake = -1;
 static int hf_multistream_data = -1;
 static int hf_multistream_version = -1;
-// static expert_field ei_multistream_EXPERTABBREV = EI_INIT;
+static expert_field ei_multistream_unknown_version = EI_INIT;
+static gchar * MULTISTREAM_v1 = "/multistream/1.0.0";
 
 /* Global sample preference ("controls" display of numbers) */
 static gboolean pref_hex = FALSE;
@@ -91,7 +92,7 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                     void *data _U_)
 {
   /* Set up structures needed to add the protocol subtree and manage it */
-  proto_item *ti; // , *expert_ti;
+  proto_item *ti, *expert_ti;
   proto_tree *multistream_tree;
   /* Other misc. local variables. */
   guint       offset = 0;
@@ -265,17 +266,22 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
    * For full details see section 1.4 of README.dissector.
    */
 
+  gchar* msVer = NULL;
   if (pinfo->num == conv->helloPacket) {
+    msVer = conv->listenerMSVer;
     col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s)", conv->listenerMSVer);
   } else if (pinfo->num == conv->selectPacket) {
+    msVer = conv->dialerMSVer;
     col_append_fstr(pinfo->cinfo, COL_INFO, " ready (%s) select (%s)", conv->dialerMSVer, conv->protocol);
   } else if (pinfo->num == conv->ackPacket) {
+    msVer = conv->listenerMSVer;
     if (conv->supported) {
       col_append_fstr(pinfo->cinfo, COL_INFO, " NACK");
     } else {
       col_append_fstr(pinfo->cinfo, COL_INFO, " ACK (%s)", conv->protocol);
     }
   } else if (conv->handshaked) {
+    msVer = conv->listenerMSVer;
     col_set_str(pinfo->cinfo, COL_PROTOCOL, conv->protocol);
     col_set_str(pinfo->cinfo, COL_INFO, "Data");
     if (len == 1) {
@@ -284,6 +290,9 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       col_append_fstr(pinfo->cinfo, COL_INFO, " %i bytes", len);
     }
     raw = TRUE;
+  }
+  if (msVer && strcmp(msVer, MULTISTREAM_v1) != 0) {
+    col_append_str(pinfo->cinfo, COL_INFO, " [Unknown Multistream Version!]");
   }
 
   /*** PROTOCOL TREE ***/
@@ -319,18 +328,18 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     hidden = NULL;
 
     if (pinfo->num == conv->helloPacket) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, -1,  conv->listenerMSVer);
+      expert_ti = proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, -1,  conv->listenerMSVer);
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (pinfo->num == conv->selectPacket) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 20,  conv->dialerMSVer);
+      expert_ti = proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 20,  conv->dialerMSVer);
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 21, -1, conv->protocol);
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (pinfo->num == conv->ackPacket) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 0,  conv->listenerMSVer);
+      expert_ti = proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 0,  conv->listenerMSVer);
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, -1, conv->protocol);
       hidden = proto_tree_add_boolean(multistream_tree, hf_multistream_handshake, tvb, 0, 0, 1);
     } else if (conv->handshaked) {
-      proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 0,  conv->listenerMSVer); // at this point they are equal
+      expert_ti = proto_tree_add_string(multistream_tree, hf_multistream_version, tvb, 0, 0,  conv->listenerMSVer); // at this point they are equal
       proto_tree_add_string(multistream_tree, hf_multistream_protocol, tvb, 0, 0, conv->protocol);
       hidden = proto_tree_add_item(multistream_tree, hf_multistream_data, tvb, 0, -1, ENC_NA);
       PROTO_ITEM_SET_HIDDEN(hidden);
@@ -340,6 +349,9 @@ dissect_multistream(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (hidden) {
       PROTO_ITEM_SET_HIDDEN(hidden);
       PROTO_ITEM_SET_GENERATED(hidden);
+    }
+    if (msVer && strcmp(msVer, MULTISTREAM_v1) != 0) {
+      expert_add_info(pinfo, expert_ti, &ei_multistream_unknown_version);
     }
   }
 
@@ -422,10 +434,10 @@ proto_register_multistream(void)
 
   /* Setup protocol expert items */
   static ei_register_info ei[] = {
-          /* { &ei_multistream_EXPERTABBREV,
-            { "multistream.EXPERTABBREV", PI_GROUP, PI_SEVERITY,
-              "EXPERTDESCR", EXPFILL }
-          } */
+          { &ei_multistream_unknown_version,
+            { "multistream.unknown_version", PI_ASSUMPTION, PI_ERROR,
+              "Unknown multistream version", EXPFILL }
+          }
   };
 
   /* Register the protocol name and description */
