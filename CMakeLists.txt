@@ -21,6 +21,7 @@ set(DISSECTOR_SRC
 		packet-multistream.c
 		packet-secio.c
 		packet-yamux.c
+		packet-spdy.c
 		protos/secio.pb-c.c
 		protos/key.pb-c.c
 )
