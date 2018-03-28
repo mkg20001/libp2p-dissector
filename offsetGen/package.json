@@ -1,0 +1,14 @@
+{
+  "name": "libp2p-dissector-offset-generator",
+  "version": "1.0.0",
+  "description": "Generates an offset calculator from a .proto file",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Maciej Krüger <mkg20001@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "protocol-buffers-schema": "^3.3.2"
+  }
+}

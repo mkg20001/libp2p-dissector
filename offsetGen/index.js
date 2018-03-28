@@ -8,8 +8,14 @@ const s = pschema(content)
 
 const redef = ['protobuf_c_version', 'protobuf_c_version_number', 'protobuf_c_buffer_simple_append', 'protobuf_c_message_get_packed_size', 'protobuf_c_message_pack', 'protobuf_c_message_pack_to_buffer', 'protobuf_c_message_unpack', 'protobuf_c_message_free_unpacked', 'protobuf_c_message_init', 'protobuf_c_message_check', 'protobuf_c_service_invoke_internal', 'protobuf_c_service_generated_init', 'protobuf_c_service_destroy', 'protobuf_c_enum_descriptor_get_value_by_name', 'protobuf_c_enum_descriptor_get_value', 'protobuf_c_message_descriptor_get_field_by_name', 'protobuf_c_message_descriptor_get_field', 'protobuf_c_service_descriptor_get_method_by_name']
 
-function getPbufCode() {
-  let d = fs.readFileSync('../protobuf-c/protobuf-c/protobuf-c.c').toString().replace('const char protobuf_c_empty_string[] = "";', '').replace('; \\\n                }', ';}')
+function lcase (s) {
+  s = s.substr(0, 1).toLowerCase() + s.substr(1)
+  s = s.replace(/[A-Z]/g, a => '_' + a.toLowerCase())
+  return s
+}
+
+function getPbufCode () { // just don't touch it. plz.
+  let d = fs.readFileSync(MAIN + '/protobuf-c/protobuf-c/protobuf-c.c').toString().replace('const char protobuf_c_empty_string[] = "";', '').replace('; \\\n                }', ';}')
   redef.forEach(v => {
     let re = new RegExp('^.*\\n.*' + v + '.+(\\n.+)*\\n{', 'm')
     let s = d.replace(re, () => 'ȣ').split('ȣ')
@@ -58,7 +64,12 @@ size_t field_packed(const ProtobufCFieldDescriptor *field, const void *member, c
 }
 `
 
-function con(d) {
+const helperHead = `
+#include<protobuf-c.h>
+size_t field_packed(const ProtobufCFieldDescriptor *field, const void *member, const void *qmember);
+`
+
+function con (d) {
   return d.map(d => [d.file, d.head]).reduce((a, b) => {
     a[0] += '\n\n' + b[0]
     a[1] += '\n\n' + b[1]
@@ -66,14 +77,18 @@ function con(d) {
   }, ['', ''])
 }
 
-function buildExpr (msg, f, isSetExpr, ptype, qmemberExpr) {
-  let expr = 'msg->' + f.name
-  let _h_expr = 'count->has_' + f.name
-  let _o_expr = 'count->off_' + f.name
-  let _l_expr = 'count->len_' + f.name
-  let getLenExpr = `field_packed(desc_${f.name}, (const void *) &${expr}, ${qmemberExpr})`
+function buildExpr (msg, f, isSetExpr, getExpr) {
+  let _h_expr = 'count->has_' + f.l
+  let _o_expr = 'count->off_' + f.l
+  let _l_expr = 'count->len_' + f.l
+
+  let qexpr = 'NULL'
+  if (!f.required) qexpr = `(const void *)&count->has_${f.l}`
+  if (f.repeated) qexpr = `(const void *)&msg->n_${f.l}`
+
+  let getLenExpr = `field_packed(desc_${f.l}, (const void *) ${getExpr}, ${qexpr})`
   let o = []
-  o.push(`const ProtobufCFieldDescriptor* desc_${f.name} = ${msg.name.toLowerCase()}__descriptor.fields + ${f.tag};`)
+  o.push(`const ProtobufCFieldDescriptor* desc_${f.l} = ${msg.l}__descriptor.fields + ${f.tag - 1};`)
   if (!f.required) {
     o.push(`${_h_expr} = ${isSetExpr};`)
     o.push(`if (${isSetExpr}) {`)
@@ -108,22 +123,21 @@ function processMessage (msg, path) {
     head: ''
   }
 
+  msg.l = lcase(msg.name)
   msg.fields.forEach(f => {
-    let expr = 'msg->' + f.name
-    let {name} = f
-    let type
-    let ptype = 'PROTOBUF_C_TYPE_'
-    let qexpr = 'NULL'
-    if (!f.required) qexpr = '(const void *)&count->has_' + f.name
-    if (f.repeated) qexpr = '(const void *)&msg->n_' + f.name
+    f.l = lcase(f.name)
+    let expr = 'msg->' + f.l
+    let name = f.l
+    let getExpr = 'msg->' + f.l
     if (!f.required) struct.push(`gboolean has_${name};`)
     struct.push(`size_t off_${name};`)
     struct.push(`size_t len_${name};`)
     switch (f.type) {
       case 'string':
-        type = 'char *'
-        ptype += 'STRING'
-        fnc.push(...buildExpr(msg, f, `${expr} != NULL`, ptype, qexpr))
+        fnc.push(...buildExpr(msg, f, `${expr} != NULL`, '&' + getExpr))
+        break
+      case 'bytes':
+        fnc.push(...buildExpr(msg, f, `msg->has_` + f.l, '&' + getExpr))
         break
     }
   })
@@ -134,12 +148,17 @@ function processMessage (msg, path) {
   }
 }
 
+const path = require('path')
+const MAIN = path.dirname(__dirname)
+
 function processSchema (s, name) {
   let [file, head] = con(s.messages.map(s => processMessage(s)))
-  file = [`#include <${name}.offset.h>`, getPbufCode().toString(), helper, '', file].join('\n')
-  head = ['#include <epan/packet.h>', '#include <protobuf-c.h>', `#include <protos/${name}.pb-c.h>`, head].join('\n\n')
-  fs.writeFileSync(`../${name}.offset.c`, Buffer.from(file))
-  fs.writeFileSync(`../${name}.offset.h`, Buffer.from(head))
+  file = [`#include <${name}.offset.h>`, '', file].join('\n')
+  head = ['#include <epan/packet.h>', '#include <_.offset.h>', `#include <protos/${name}.pb-c.h>`, head].join('\n\n')
+  fs.writeFileSync(`${MAIN}/_.offset.c`, Buffer.from(['#include<_.offset.h>', getPbufCode(), helper].join('\n\n')))
+  fs.writeFileSync(`${MAIN}/_.offset.h`, Buffer.from(helperHead))
+  fs.writeFileSync(`${MAIN}/${name}.offset.c`, Buffer.from(file))
+  fs.writeFileSync(`${MAIN}/${name}.offset.h`, Buffer.from(head))
 }
 
-console.log(processSchema(s, 'secio'))
+processSchema(s, path.basename(inProto).split('.').shift())

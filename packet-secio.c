@@ -28,6 +28,7 @@
 #include <epan/expert.h>   /* Include only as needed */
 #include <epan/prefs.h>    /* Include only as needed */
 #include <protos/secio.pb-c.h>
+#include <secio.offset.h>
 #include <protos/key.pb-c.h>
 #include <epan/conversation.h>
 #include <stdio.h>
@@ -304,12 +305,13 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (pinfo->num == state->proposePacket) {
       if (state->propose) {
         // TODO: add _real_ tvb positions
+        ProposeCount* count = countPropose(4, state->propose);
         proto_tree *propose_tree = proto_item_add_subtree(proto_tree_add_boolean(secio_tree, hf_secio_propose, tvb, 4, len - 4, 1), ett_propose);
-        proto_tree_add_bytes(propose_tree, hf_secio_propose_rand, tvb, 6, (gint)state->propose->rand.len, state->propose->rand.data); // TODO: fix this
-        proto_tree_add_boolean(propose_tree, hf_secio_propose_pubkey, tvb, (state->propose->pubkey.len > 255 ? 8 : 7) + (gint)state->propose->rand.len, (gint)state->propose->pubkey.len, 1); // TODO: extend this
-        proto_tree_add_string(propose_tree, hf_secio_propose_exchanges, tvb, 0, 0, state->propose->exchanges);
-        proto_tree_add_string(propose_tree, hf_secio_propose_ciphers, tvb, 0, 0, state->propose->ciphers);
-        proto_tree_add_string(propose_tree, hf_secio_propose_hashes, tvb, 0, 0, state->propose->hashes);
+        proto_tree_add_bytes(propose_tree, hf_secio_propose_rand, tvb, (gint)(count->off_rand + (count->len_rand - state->propose->rand.len)), (gint)state->propose->rand.len, state->propose->rand.data); // TODO: fix this
+        proto_tree_add_boolean(propose_tree, hf_secio_propose_pubkey, tvb, (gint)count->off_pubkey, (gint)count->len_pubkey, 1); // TODO: extend this
+        proto_tree_add_string(propose_tree, hf_secio_propose_exchanges, tvb, (gint)count->off_pubkey, (gint)count->len_pubkey, state->propose->exchanges);
+        proto_tree_add_string(propose_tree, hf_secio_propose_ciphers, tvb, (gint)count->off_pubkey, (gint)count->len_pubkey, state->propose->ciphers);
+        proto_tree_add_string(propose_tree, hf_secio_propose_hashes, tvb, (gint)count->off_pubkey, (gint)count->len_pubkey, state->propose->hashes);
       } else {
         expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 4, -1, ENC_NA), &ei_secio_pbuf_error);
       }

@@ -33,6 +33,9 @@ set(PLUGIN_FILES_REAL
 set(PLUGIN_FILES
 	${PLUGIN_FILES_REAL}
 	${PC_SOURCES}
+	secio.offset.c
+	key.offset.c
+	_.offset.c
 )
 
 set_source_files_properties(
@@ -53,8 +56,13 @@ macro(compile_proto_file filename)
 			--plugin=$<TARGET_FILE:protoc-gen-c>
 			--c_out=${CMAKE_CURRENT_SOURCE_DIR}/protos
 	)
+	add_custom_command(
+			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${basename}.offset.c ${CMAKE_CURRENT_SOURCE_DIR}/${basename}.offset.h ${CMAKE_CURRENT_SOURCE_DIR}/_.offset.c ${CMAKE_CURRENT_SOURCE_DIR}/_.offset.h
+			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/offsetGen/index.js ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
+			COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/offsetGen ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
+	)
 	add_custom_target(compileProto${basename}
-			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h)
+			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h ${CMAKE_CURRENT_SOURCE_DIR}/${basename}.offset.c ${CMAKE_CURRENT_SOURCE_DIR}/${basename}.offset.h)
 	add_dependencies(libp2p compileProto${basename})
 endmacro(compile_proto_file)
 
