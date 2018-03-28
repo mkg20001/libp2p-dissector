@@ -2,7 +2,7 @@
 
 Dissect Libp2p Packets in WireShark
 
-![Screenshot][/img/screenshot.png?raw=true]
+![Screenshot](/img/screenshot.png?raw=true)
 
 ## Todo:
  - [x] Write dissector for multistream
