@@ -303,10 +303,10 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     if (pinfo->num == state->proposePacket) {
       if (state->propose) {
-        // TODO: add tvb positions
-        proto_tree *propose_tree = proto_item_add_subtree(proto_tree_add_boolean(secio_tree, hf_secio_propose, tvb, 0, 0, 1), ett_propose);
-        proto_tree_add_bytes(propose_tree, hf_secio_propose_rand, tvb, 0, (gint)state->propose->rand.len, state->propose->rand.data); // TODO: fix this
-        proto_tree_add_boolean(propose_tree, hf_secio_propose_pubkey, tvb, 0, 0, 1); // TODO: extend this
+        // TODO: add _real_ tvb positions
+        proto_tree *propose_tree = proto_item_add_subtree(proto_tree_add_boolean(secio_tree, hf_secio_propose, tvb, 4, len - 4, 1), ett_propose);
+        proto_tree_add_bytes(propose_tree, hf_secio_propose_rand, tvb, 6, (gint)state->propose->rand.len, state->propose->rand.data); // TODO: fix this
+        proto_tree_add_boolean(propose_tree, hf_secio_propose_pubkey, tvb, (state->propose->pubkey.len > 255 ? 8 : 7) + (gint)state->propose->rand.len, (gint)state->propose->pubkey.len, 1); // TODO: extend this
         proto_tree_add_string(propose_tree, hf_secio_propose_exchanges, tvb, 0, 0, state->propose->exchanges);
         proto_tree_add_string(propose_tree, hf_secio_propose_ciphers, tvb, 0, 0, state->propose->ciphers);
         proto_tree_add_string(propose_tree, hf_secio_propose_hashes, tvb, 0, 0, state->propose->hashes);
