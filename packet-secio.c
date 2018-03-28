@@ -63,6 +63,8 @@ static int hf_secio_propose_exchanges = -1;
 static int hf_secio_propose_ciphers = -1;
 static int hf_secio_propose_hashes = -1;
 static int hf_secio_exchange = -1;
+static int hf_secio_exchange_epubkey = -1;
+static int hf_secio_exchange_signature = -1;
 static int hf_secio_version = -1;
 static expert_field ei_secio_pbuf_error = EI_INIT;
 
@@ -304,10 +306,9 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     if (pinfo->num == state->proposePacket) {
       if (state->propose) {
-        // TODO: add _real_ tvb positions
         ProposeCount* count = countPropose(4, state->propose);
         proto_tree *propose_tree = proto_item_add_subtree(proto_tree_add_boolean(secio_tree, hf_secio_propose, tvb, 4, len - 4, 1), ett_propose);
-        proto_tree_add_bytes(propose_tree, hf_secio_propose_rand, tvb, (gint)(count->off_rand + (count->len_rand - state->propose->rand.len)), (gint)state->propose->rand.len, state->propose->rand.data); // TODO: fix this
+        proto_tree_add_bytes(propose_tree, hf_secio_propose_rand, tvb, (gint)(count->off_rand + (count->len_rand - state->propose->rand.len)), (gint)state->propose->rand.len, state->propose->rand.data);
         proto_tree_add_boolean(propose_tree, hf_secio_propose_pubkey, tvb, (gint)count->off_pubkey, (gint)count->len_pubkey, 1); // TODO: extend this
         proto_tree_add_string(propose_tree, hf_secio_propose_exchanges, tvb, (gint)count->off_exchanges, (gint)count->len_exchanges, state->propose->exchanges);
         proto_tree_add_string(propose_tree, hf_secio_propose_ciphers, tvb, (gint)count->off_ciphers, (gint)count->len_ciphers, state->propose->ciphers);
@@ -317,7 +318,10 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       }
     } else if (pinfo->num == state->exchangePacket) {
       if (state->exchange) {
-        // TODO: add
+        ExchangeCount* count = countExchange(4, state->exchange);
+        proto_tree *exchange_tree = proto_item_add_subtree(proto_tree_add_boolean(secio_tree, hf_secio_exchange, tvb, 4, len - 4, 1), ett_exchange);
+        proto_tree_add_bytes(exchange_tree, hf_secio_exchange_epubkey, tvb, (gint)(count->off_epubkey + (count->len_epubkey - state->exchange->epubkey.len)), (gint)state->exchange->epubkey.len, state->exchange->epubkey.data);
+        proto_tree_add_bytes(exchange_tree, hf_secio_exchange_signature, tvb, (gint)(count->off_signature + (count->len_signature - state->exchange->signature.len)), (gint)state->exchange->signature.len, state->exchange->signature.data);
       } else {
         expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 4, -1, ENC_NA), &ei_secio_pbuf_error);
       }
@@ -396,6 +400,14 @@ proto_register_secio(void)
                   { "Exchange",    "secio.exchange",
                           FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
                           "Exchange Request Data", HFILL }},
+          { &hf_secio_exchange_epubkey,
+                  { "EPubKey",    "secio.exchange.epubkey",
+                          FT_BYTES,       BASE_NONE,      NULL,   0x0,
+                          "Ephermal public key", HFILL }},
+          { &hf_secio_exchange_signature,
+                  { "Signature",    "secio.exchange.signature",
+                          FT_BYTES,       BASE_NONE,      NULL,   0x0,
+                          "Exchange Data signature", HFILL }},
           { &hf_secio_version,
                   { "Version",    "secio.version",
                           FT_STRING,       BASE_NONE,      NULL,   0x0,
