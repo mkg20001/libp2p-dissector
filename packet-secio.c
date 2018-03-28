@@ -55,6 +55,13 @@ static int hf_secio_dialer = -1;
 static int hf_secio_listener = -1;
 static int hf_secio_handshake = -1;
 static int hf_secio_data = -1;
+static int hf_secio_propose = -1;
+static int hf_secio_propose_rand = -1;
+static int hf_secio_propose_pubkey = -1;
+static int hf_secio_propose_exchanges = -1;
+static int hf_secio_propose_ciphers = -1;
+static int hf_secio_propose_hashes = -1;
+static int hf_secio_exchange = -1;
 static int hf_secio_version = -1;
 static expert_field ei_secio_pbuf_error = EI_INIT;
 
@@ -68,6 +75,8 @@ static guint tcp_port_pref = secio_TCP_PORT;
 
 /* Initialize the subtree pointers */
 static gint ett_secio = -1;
+static gint ett_propose = -1;
+static gint ett_exchange = -1;
 
 typedef struct _secio_conv_info_t {
     addr_pair* dialer;
@@ -84,8 +93,8 @@ typedef struct _secio_conn_state_t {
     guint32 exchangePacket;
     PublicKey* key;
     PublicKey* ekey;
-    PrivateKey* ePrivKey; // from session key dump
-    gchar* sharedSecret; // if we have one session key use the shared secret to generate it
+    PrivateKey* ePrivKey; // from key dump
+    gchar* sharedSecret; // from key dump
 } secio_conn_state_t;
 
 /* A sample #define of the minimum length (in bytes) of the protocol data.
@@ -215,6 +224,17 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
   }
 
+  if (conv->handshaked && pinfo->num != state->proposePacket && pinfo->num != state->exchangePacket) {
+    gchar* buf;
+    int bytesCount;
+    buf = lp_decode_fixed(tvb, 0, 4, &bytesCount);
+    if (!buf) {
+      pinfo->desegment_len = (guint32)bytesCount - len;
+    } else {
+      // guint8* encData = tvb_get_raw_string(wmem_packet_scope(), tvb, 4, bytesCount - 4);
+    }
+  }
+
   /*** COLUMN DATA ***/
 
   /* There are two normal columns to fill in: the 'Protocol' column which
@@ -239,12 +259,14 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
    * For full details see section 1.4 of README.dissector.
    */
 
-  if (pinfo->num == state->proposePacket) {
-    col_set_str(pinfo->cinfo, COL_INFO, "SECIO Propose");
-  } else if (pinfo->num == state->exchangePacket) {
-    col_set_str(pinfo->cinfo, COL_INFO, "SECIO Exchange");
-  } else if (conv->handshaked) {
-    col_set_str(pinfo->cinfo, COL_INFO, "SECIO Data");
+  if (!pinfo->desegment_len) {
+    if (pinfo->num == state->proposePacket) {
+      col_set_str(pinfo->cinfo, COL_INFO, "SECIO Propose");
+    } else if (pinfo->num == state->exchangePacket) {
+      col_set_str(pinfo->cinfo, COL_INFO, "SECIO Exchange");
+    } else if (conv->handshaked) {
+      col_set_str(pinfo->cinfo, COL_INFO, "SECIO Data");
+    }
   }
 
   /*** PROTOCOL TREE ***/
@@ -281,7 +303,13 @@ dissect_secio(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     if (pinfo->num == state->proposePacket) {
       if (state->propose) {
-        // TODO: add
+        // TODO: add tvb positions
+        proto_tree *propose_tree = proto_item_add_subtree(proto_tree_add_boolean(secio_tree, hf_secio_propose, tvb, 0, 0, 1), ett_propose);
+        proto_tree_add_bytes(propose_tree, hf_secio_propose_rand, tvb, 0, (gint)state->propose->rand.len, state->propose->rand.data); // TODO: fix this
+        proto_tree_add_boolean(propose_tree, hf_secio_propose_pubkey, tvb, 0, 0, 1); // TODO: extend this
+        proto_tree_add_string(propose_tree, hf_secio_propose_exchanges, tvb, 0, 0, state->propose->exchanges);
+        proto_tree_add_string(propose_tree, hf_secio_propose_ciphers, tvb, 0, 0, state->propose->ciphers);
+        proto_tree_add_string(propose_tree, hf_secio_propose_hashes, tvb, 0, 0, state->propose->hashes);
       } else {
         expert_add_info(pinfo, proto_tree_add_item(secio_tree, hf_secio_data, tvb, 4, -1, ENC_NA), &ei_secio_pbuf_error);
       }
@@ -338,6 +366,34 @@ proto_register_secio(void)
                   { "Data",    "secio.data",
                           FT_BYTES,       BASE_NONE,      NULL,   0x0,
                           "Raw, decrypted bytes transferred (WIP)", HFILL }},
+          { &hf_secio_propose,
+                  { "Propose",    "secio.propose",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "Propose Request", HFILL }},
+          { &hf_secio_propose_rand,
+                  { "Random",    "secio.propose.rand",
+                          FT_BYTES,       BASE_NONE,      NULL,   0x0,
+                          "Propose Random bytes", HFILL }},
+          { &hf_secio_propose_pubkey,
+                  { "Public Key",    "secio.propose.pubkey",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "Propose Public key", HFILL }},
+          { &hf_secio_propose_exchanges,
+                  { "Exchanges",    "secio.propose.exchanges",
+                          FT_STRING,       BASE_NONE,      NULL,   0x0,
+                          "Propose Exchanges", HFILL }},
+          { &hf_secio_propose_ciphers,
+                  { "Ciphers",    "secio.propose.ciphers",
+                          FT_STRING,       BASE_NONE,      NULL,   0x0,
+                          "Propose Ciphers", HFILL }},
+          { &hf_secio_propose_hashes,
+                  { "Hashes",    "secio.propose.hashes",
+                          FT_STRING,       BASE_NONE,      NULL,   0x0,
+                          "Propose Hashes", HFILL }},
+          { &hf_secio_exchange,
+                  { "Exchange",    "secio.exchange",
+                          FT_BOOLEAN,       BASE_NONE,      NULL,   0x0,
+                          "Exchange Request Data", HFILL }},
           { &hf_secio_version,
                   { "Version",    "secio.version",
                           FT_STRING,       BASE_NONE,      NULL,   0x0,
@@ -346,7 +402,9 @@ proto_register_secio(void)
 
   /* Setup protocol subtree array */
   static gint *ett[] = {
-          &ett_secio
+          &ett_secio,
+          &ett_propose,
+          &ett_exchange
   };
 
   /* Setup protocol expert items */
