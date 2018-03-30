@@ -8,7 +8,6 @@
 #
 
 include(WiresharkPlugin)
-include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf-c.cmake)
 
 # Plugin name and version info (major minor micro extra)
@@ -50,8 +49,8 @@ macro(compile_proto_file filename)
 	get_filename_component(basename ${filename} NAME_WE)
 	add_custom_command(
 			OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h
-			DEPENDS protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
-			COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
+			DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
+			COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
 			--proto_path=${CMAKE_CURRENT_SOURCE_DIR}/protos
 			--plugin=$<TARGET_FILE:protoc-gen-c>
 			--c_out=${CMAKE_CURRENT_SOURCE_DIR}/protos
@@ -61,10 +60,8 @@ macro(compile_proto_file filename)
 			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/offsetGen/index.js ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
 			COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/offsetGen ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.proto
 	)
-	add_custom_target(compileProto${basename}
-			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.c ${CMAKE_CURRENT_SOURCE_DIR}/protos/${basename}.pb-c.h ${CMAKE_CURRENT_SOURCE_DIR}/${basename}.offset.c ${CMAKE_CURRENT_SOURCE_DIR}/${basename}.offset.h)
-	add_dependencies(libp2p compileProto${basename})
 endmacro(compile_proto_file)
+
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 

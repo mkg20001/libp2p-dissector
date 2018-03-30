@@ -1,6 +1,3 @@
-[submodule "protobuf"]
-	path = protobuf
-	url = https://github.com/google/protobuf
 [submodule "protobuf-c"]
 	path = protobuf-c
 	url = https://github.com/protobuf-c/protobuf-c
