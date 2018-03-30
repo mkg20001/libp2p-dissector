@@ -7,8 +7,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 
+set(NOT_INCLUDE_PROTOBUF_C YES)
 include(WiresharkPlugin)
 include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf-c.cmake)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/crypto)
 
 # Plugin name and version info (major minor micro extra)
 set_module_info(libp2p 0 0 1 0)
@@ -64,6 +66,7 @@ endmacro(compile_proto_file)
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/crypto)
 
 register_plugin_files(plugin.c
 	plugin
@@ -76,6 +79,7 @@ foreach(proto_file ${PROTOS})
 endforeach(proto_file)
 
 target_link_libraries(libp2p epan)
+target_link_libraries(libp2p c_libp2p_crypto)
 
 install_plugin(libp2p epan)
 
