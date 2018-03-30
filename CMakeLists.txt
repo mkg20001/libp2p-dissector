@@ -76,8 +76,6 @@ foreach(proto_file ${PROTOS})
 endforeach(proto_file)
 
 target_link_libraries(libp2p epan)
-target_link_libraries(libp2p libprotobuf)
-target_link_libraries(libp2p protobuf-c)
 
 install_plugin(libp2p epan)
 
