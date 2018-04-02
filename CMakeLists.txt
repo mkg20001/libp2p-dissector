@@ -8,6 +8,7 @@
 #
 
 set(NOT_INCLUDE_PROTOBUF_C YES)
+set(NOT_BUILD_LIBP2P_CRYPTO_TESTS YES)
 include(WiresharkPlugin)
 include(${CMAKE_CURRENT_SOURCE_DIR}/protobuf-c.cmake)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/crypto)
